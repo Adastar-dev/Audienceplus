@@ -43,6 +43,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/audiences/{audience}/ouvrir', [AudienceController::class, 'ouvrir'])->middleware('role:JUGE');
     Route::post('/audiences/{audience}/fermer', [AudienceController::class, 'fermer'])->middleware('role:JUGE');
     Route::post('/audiences/{audience}/renvoyer', [AudienceController::class, 'renvoyer'])->middleware('role:JUGE');
+    Route::get('/audiences/{audience}/jitsi-jeton', [AudienceController::class, 'jetonJitsi']);
+    Route::post('/audiences/{audience}/juge-connecte', [AudienceController::class, 'jugeConnecte'])->middleware('role:JUGE');
+    Route::post('/audiences/{audience}/juge-deconnecte', [AudienceController::class, 'jugeDeconnecte'])->middleware('role:JUGE');
     Route::post('/audiences/{audience}/decider', [AudienceController::class, 'decider'])->middleware('role:JUGE');
     Route::post('/audiences/{audience}/participants/{participation}/admettre', [AudienceController::class, 'admettreParticipant'])
         ->middleware('role:JUGE');

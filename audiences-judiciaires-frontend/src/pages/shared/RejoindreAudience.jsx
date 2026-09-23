@@ -1,12 +1,19 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Loader2 } from 'lucide-react'
-import { getAudienceById } from '../../services/api/audiences'
+import { getAudienceById, getJetonJitsi } from '../../services/api/audiences'
 import JitsiMeetRoom from '../../components/jitsi/JitsiMeetRoom'
 import { useAuth } from '../../context/AuthContext'
+import { StatutAudience } from '../../constants/enums'
+
+const INTERVALLE_ATTENTE_MS = 5000
 
 // Page de visioconférence pour les participants non-juge : pas de contrôle
 // micro/caméra sur les autres, juste rejoindre et quitter.
+//
+// On attend que le juge soit connecté à la conférence (audience.juge_connecte)
+// avant de demander un jeton Jitsi : le backend le refuse sinon, et le juge
+// peut ainsi activer la salle d'attente avant que quiconque n'entre.
 export default function RejoindreAudience({ backTo }) {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -14,6 +21,8 @@ export default function RejoindreAudience({ backTo }) {
   const [audience, setAudience] = useState(null)
   const [chargement, setChargement] = useState(true)
   const [erreur, setErreur] = useState('')
+  const [jeton, setJeton] = useState(null)
+  const [erreurSalle, setErreurSalle] = useState('')
 
   useEffect(() => {
     getAudienceById(id)
@@ -21,6 +30,26 @@ export default function RejoindreAudience({ backTo }) {
       .catch(() => setErreur('Impossible de charger cette audience.'))
       .finally(() => setChargement(false))
   }, [id])
+
+  const salleOuverte = audience?.statut === StatutAudience.EN_COURS && audience?.juge_connecte
+  const enAttente = audience && !jeton && [StatutAudience.PROGRAMMEE, StatutAudience.EN_COURS].includes(audience.statut)
+
+  // Une fois entré, on garde la conférence même si le juge se déconnecte
+  // brièvement : seule l'entrée est conditionnée à sa présence.
+  useEffect(() => {
+    if (!salleOuverte || jeton) return
+    getJetonJitsi(id)
+      .then(setJeton)
+      .catch((e) => setErreurSalle(e.response?.data?.message ?? "Impossible d'entrer dans la salle."))
+  }, [id, salleOuverte, jeton])
+
+  useEffect(() => {
+    if (!enAttente || salleOuverte) return
+    const timer = setInterval(() => {
+      getAudienceById(id).then(setAudience).catch(() => {})
+    }, INTERVALLE_ATTENTE_MS)
+    return () => clearInterval(timer)
+  }, [id, enAttente, salleOuverte])
 
   if (chargement) {
     return (
@@ -55,7 +84,26 @@ export default function RejoindreAudience({ backTo }) {
       </div>
 
       <div className="flex-1">
-        <JitsiMeetRoom roomName={`audience-${id}`} displayName={user?.nom ?? 'Participant'} />
+        {jeton ? (
+          <JitsiMeetRoom
+            domain={jeton.domaine}
+            roomName={jeton.salle}
+            jwt={jeton.jwt}
+            displayName={user?.nom ?? 'Participant'}
+            onLeft={() => navigate(backTo ?? -1)}
+          />
+        ) : erreurSalle ? (
+          <div className="w-full h-full flex items-center justify-center text-navy-100 text-sm">{erreurSalle}</div>
+        ) : enAttente ? (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-navy-100 text-sm">
+            <Loader2 size={20} className="animate-spin" />
+            En attente de l'ouverture de la salle par le juge...
+          </div>
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-navy-100 text-sm">
+            Cette audience n'est plus accessible.
+          </div>
+        )}
       </div>
     </div>
   )

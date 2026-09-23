@@ -8,6 +8,7 @@ use App\Models\Dossier;
 use App\Models\ParticipationAudience;
 use App\Models\SalleVirtuelle;
 use App\Models\Utilisateur;
+use App\Services\JitsiTokenService;
 use App\Services\NotificationDispatcher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -45,7 +46,9 @@ class AudienceController extends Controller
             'id_dossier' => 'required|exists:dossiers,id_dossier',
             'id_juge' => 'nullable|exists:utilisateurs,id_utilisateur',
             'date_heure' => 'required|date|after:now',
-            'mode' => 'nullable|in:PRESENTIEL,EN_LIGNE',
+            // Une audience est toujours programmee en presentiel : l'acces a distance
+            // passe par une demande du justiciable (DemandeDistanceController).
+            'mode' => 'nullable|in:PRESENTIEL',
         ]);
 
         if ($validator->fails()) {
@@ -56,7 +59,7 @@ class AudienceController extends Controller
             'id_dossier' => $request->id_dossier,
             'id_juge' => $request->id_juge,
             'date_heure' => $request->date_heure,
-            'mode' => $request->mode ?? 'PRESENTIEL',
+            'mode' => 'PRESENTIEL',
             'statut' => 'PROGRAMMEE',
         ]);
 
@@ -115,6 +118,66 @@ class AudienceController extends Controller
         return response()->json($audience->load('salle'));
     }
 
+    // Appele par la salle du juge une fois la conference Jitsi rejointe (juge
+    // moderateur) puis a sa sortie : les autres participants attendent ce signal
+    // avant de charger Jitsi, sinon le premier arrive deviendrait moderateur.
+    public function jugeConnecte(Request $request, Audience $audience)
+    {
+        return $this->definirPresenceJuge($request, $audience, true);
+    }
+
+    public function jugeDeconnecte(Request $request, Audience $audience)
+    {
+        return $this->definirPresenceJuge($request, $audience, false);
+    }
+
+    // Jeton d'acces a la salle Jitsi : modérateur pour le juge de l'audience,
+    // simple participant pour les autres, et seulement une fois le juge entre.
+    public function jetonJitsi(Request $request, Audience $audience, JitsiTokenService $jitsi)
+    {
+        $utilisateur = $request->user();
+        $audience->refresh();
+
+        if ($audience->statut !== 'EN_COURS') {
+            return response()->json(['message' => "L'audience n'est pas en cours."], 409);
+        }
+
+        $estJuge = $utilisateur->role === 'JUGE'
+            && (! $audience->id_juge || (int) $audience->id_juge === (int) $utilisateur->id_utilisateur);
+
+        if (! $estJuge) {
+            if (! $audience->dossier->estAccessiblePar($utilisateur)) {
+                return response()->json(['message' => "Vous n'avez pas accès à cette audience."], 403);
+            }
+
+            if (! $audience->juge_connecte) {
+                return response()->json(['message' => "Le juge n'a pas encore ouvert la salle."], 409);
+            }
+        }
+
+        return response()->json([
+            'domaine' => $jitsi->domaine(),
+            'salle' => $jitsi->nomSalle($audience),
+            'jwt' => $jitsi->genererJeton($audience, $utilisateur, $estJuge),
+            'moderateur' => $estJuge,
+        ]);
+    }
+
+    private function definirPresenceJuge(Request $request, Audience $audience, bool $connecte)
+    {
+        if ($audience->id_juge && (int) $audience->id_juge !== (int) $request->user()->id_utilisateur) {
+            return response()->json(['message' => "Vous n'êtes pas le juge de cette audience."], 403);
+        }
+
+        if ($connecte && $audience->statut !== 'EN_COURS') {
+            return response()->json(['message' => "L'audience doit être ouverte avant d'entrer dans la salle."], 409);
+        }
+
+        $audience->update(['juge_connecte' => $connecte]);
+
+        return response()->json($audience);
+    }
+
     private function attribuerSalleDisponible(int $idTribunal): ?SalleVirtuelle
     {
         $sallesOccupees = Audience::where('statut', 'EN_COURS')
@@ -128,7 +191,7 @@ class AudienceController extends Controller
 
     public function fermer(Audience $audience)
     {
-        $audience->update(['statut' => 'CLOTUREE']);
+        $audience->update(['statut' => 'CLOTUREE', 'juge_connecte' => false]);
 
         if ($audience->type_decision === 'JUGEMENT') {
             $audience->dossier()->update(['statut' => 'JUGE']);
@@ -140,7 +203,7 @@ class AudienceController extends Controller
 
     public function renvoyer(Audience $audience)
     {
-        $audience->update(['statut' => 'RENVOYEE', 'type_decision' => 'RENVOI']);
+        $audience->update(['statut' => 'RENVOYEE', 'type_decision' => 'RENVOI', 'juge_connecte' => false]);
         $audience->dossier()->update(['statut' => 'RENVOYE']);
         $this->notifierDecision($audience, "L'audience a été renvoyée à une date ultérieure.");
 
@@ -170,6 +233,10 @@ class AudienceController extends Controller
             $audience->dossier()->update(['statut' => 'RENVOYE']);
         } elseif ($request->type === 'DELIBERE') {
             $audience->statut = 'DELIBERE';
+        }
+
+        if ($audience->statut !== 'EN_COURS') {
+            $audience->juge_connecte = false;
         }
 
         $audience->save();

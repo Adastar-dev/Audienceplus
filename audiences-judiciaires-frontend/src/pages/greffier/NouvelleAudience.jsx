@@ -4,7 +4,7 @@ import { ArrowLeft, Loader2, CalendarClock } from 'lucide-react'
 import { listerDossiers } from '../../services/api/dossiers'
 import { listerJuges } from '../../services/api/utilisateurs'
 import { creerAudience, listerAudiences } from '../../services/api/audiences'
-import { StatutAudience, ModeAudience } from '../../constants/enums'
+import { StatutAudience } from '../../constants/enums'
 import AudienceStatusBadge from '../../components/ui/AudienceStatusBadge'
 
 export default function NouvelleAudience() {
@@ -19,7 +19,6 @@ export default function NouvelleAudience() {
   const [idJuge, setIdJuge] = useState('')
   const [date, setDate] = useState('')
   const [heure, setHeure] = useState('09:00')
-  const [mode, setMode] = useState(ModeAudience.PRESENTIEL)
 
   useEffect(() => {
     Promise.all([listerDossiers(), listerJuges(), listerAudiences()])
@@ -57,7 +56,6 @@ export default function NouvelleAudience() {
         id_dossier: idDossier,
         id_juge: idJuge || null,
         date_heure: `${date} ${heure}:00`,
-        mode,
       })
       navigate(`/greffier/dossiers/${audience.id_dossier ?? idDossier}`)
     } catch {
@@ -122,30 +120,9 @@ export default function NouvelleAudience() {
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1.5">Mode</label>
-              <div className="flex border border-slate-200 rounded-md overflow-hidden text-sm">
-                <button
-                  type="button"
-                  onClick={() => setMode(ModeAudience.PRESENTIEL)}
-                  className={`flex-1 py-2 ${mode === ModeAudience.PRESENTIEL ? 'bg-navy-900 text-white' : 'bg-white text-slate-600'}`}
-                >
-                  Présentiel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMode(ModeAudience.EN_LIGNE)}
-                  className={`flex-1 py-2 ${mode === ModeAudience.EN_LIGNE ? 'bg-navy-900 text-white' : 'bg-white text-slate-600'}`}
-                >
-                  En ligne
-                </button>
-              </div>
-              {mode === ModeAudience.PRESENTIEL && (
-                <p className="text-xs text-slate-400 mt-1.5">
-                  Un justiciable pourra demander une autorisation d'assister à distance.
-                </p>
-              )}
-            </div>
+            <p className="text-xs text-slate-400">
+              L'audience se tient en présentiel. Un justiciable pourra demander une autorisation d'y assister à distance.
+            </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>

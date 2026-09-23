@@ -48,6 +48,8 @@ export const StatutAudience = {
   EN_COURS: 'EN_COURS',
   CLOTUREE: 'CLOTUREE',
   RENVOYEE: 'RENVOYEE',
+  DELIBERE: 'DELIBERE',
+  RATEE: 'RATEE',
 }
 
 export const ModeAudience = {
@@ -120,6 +122,8 @@ export const STATUT_AUDIENCE_LABELS = {
   [StatutAudience.EN_COURS]: 'En cours',
   [StatutAudience.CLOTUREE]: 'Clôturée',
   [StatutAudience.RENVOYEE]: 'Renvoyée',
+  [StatutAudience.DELIBERE]: 'En délibéré',
+  [StatutAudience.RATEE]: 'Ratée',
 }
 
 export const STATUT_PV_LABELS = {
