@@ -1,15 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 
-const JITSI_DOMAIN = 'meet.jit.si'
-
-function loadJitsiScript() {
+function loadJitsiScript(domain) {
   return new Promise((resolve, reject) => {
     if (window.JitsiMeetExternalAPI) {
       resolve()
       return
     }
     const script = document.createElement('script')
-    script.src = `https://${JITSI_DOMAIN}/external_api.js`
+    script.src = `https://${domain}/external_api.js`
     script.async = true
     script.onload = resolve
     script.onerror = reject
@@ -17,28 +15,37 @@ function loadJitsiScript() {
   })
 }
 
-// roomName doit être unique par audience et suffisamment peu devinable,
-// vu que meet.jit.si est un serveur public — à remplacer par un serveur
-// Jitsi auto-hébergé en prod si besoin d'un vrai contrôle d'accès.
+// domain / roomName / jwt viennent de GET /audiences/{id}/jitsi-jeton
+// (voir getJetonJitsi). Sur le Jitsi auto-hébergé, le jeton est obligatoire
+// et c'est lui seul qui fait du juge le modérateur. Sans jwt (backend non
+// configuré), on retombe sur meet.jit.si où le premier arrivé est modérateur.
 //
-// moderator=true (juge, premier arrivé dans la salle) active le "lobby"
-// natif de Jitsi : tout participant suivant doit "frapper" et attendre
+// moderator=true (juge) active le "lobby" natif de Jitsi : tout
+// participant suivant doit "frapper" et attendre
 // d'être admis explicitement - c'est le vrai mécanisme d'admission,
 // distinct du champ `admis` stocké en base (qui sert de journal/trace,
 // pas de barrière d'accès réelle).
-export default function JitsiMeetRoom({ roomName, displayName, moderator = false }) {
+export default function JitsiMeetRoom({ domain, roomName, jwt, displayName, moderator = false, onJoined, onLeft, onApiReady }) {
   const containerRef = useRef(null)
   const apiRef = useRef(null)
   const [status, setStatus] = useState('loading')
+  // Refs pour ne pas recreer la conference a chaque rendu du parent.
+  const onJoinedRef = useRef(onJoined)
+  onJoinedRef.current = onJoined
+  const onLeftRef = useRef(onLeft)
+  onLeftRef.current = onLeft
+  const onApiReadyRef = useRef(onApiReady)
+  onApiReadyRef.current = onApiReady
 
   useEffect(() => {
     let cancelled = false
 
-    loadJitsiScript()
+    loadJitsiScript(domain)
       .then(() => {
         if (cancelled || !containerRef.current) return
-        const api = new window.JitsiMeetExternalAPI(JITSI_DOMAIN, {
-          roomName: `aj-${roomName}`,
+        const api = new window.JitsiMeetExternalAPI(domain, {
+          roomName,
+          ...(jwt ? { jwt } : {}),
           parentNode: containerRef.current,
           width: '100%',
           height: '100%',
@@ -54,13 +61,16 @@ export default function JitsiMeetRoom({ roomName, displayName, moderator = false
         })
         apiRef.current = api
 
-        if (moderator) {
+        api.addEventListener('videoConferenceJoined', () => {
           // Le lobby ne peut être activé qu'une fois la conférence rejointe
           // (le juge doit être reconnu comme modérateur côté Jitsi).
-          api.addEventListener('videoConferenceJoined', () => {
-            api.executeCommand('toggleLobby', true)
-          })
-        }
+          if (moderator) api.executeCommand('toggleLobby', true)
+          onJoinedRef.current?.()
+        })
+        // Déclenché quand on raccroche, ou quand le juge termine la conférence
+        // pour tout le monde à la clôture de l'audience.
+        api.addEventListener('readyToClose', () => onLeftRef.current?.())
+        onApiReadyRef.current?.(api)
 
         setStatus('ready')
       })
@@ -70,7 +80,7 @@ export default function JitsiMeetRoom({ roomName, displayName, moderator = false
       cancelled = true
       apiRef.current?.dispose()
     }
-  }, [roomName, displayName, moderator])
+  }, [domain, roomName, jwt, displayName, moderator])
 
   if (status === 'error') {
     return (

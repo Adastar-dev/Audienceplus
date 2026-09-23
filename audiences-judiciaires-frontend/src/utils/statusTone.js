@@ -21,6 +21,7 @@ export function statusTone(statut) {
 
     case StatutDossier.RENVOYE:
     case StatutAudience.RENVOYEE:
+    case StatutAudience.DELIBERE:
     case StatutConvocation.REPORT_DEMANDE:
     case StatutConvocation.AVIS_GREFFIER_FAVORABLE:
     case StatutConvocation.AVIS_GREFFIER_DEFAVORABLE:
@@ -30,6 +31,7 @@ export function statusTone(statut) {
 
     case StatutConvocation.REPORT_REFUSEE:
     case StatutDemandeDistance.REFUSEE:
+    case StatutAudience.RATEE:
       return 'danger'
 
     case StatutDossier.JUGE:

@@ -1,14 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, Gavel, FileText, Loader2, Scale } from 'lucide-react'
-import {
-  getAudienceById,
-  ouvrirAudience,
-  fermerAudience,
-  renvoyerAudience,
-} from '../../services/api/audiences'
+import { getAudienceById, ouvrirAudience, cloturerAudience } from '../../services/api/audiences'
 import { getPV } from '../../services/api/procesVerbaux'
-import { updateStatutDossier } from '../../services/api/dossiers'
 import { StatutAudience, StatutPV } from '../../constants/enums'
 import AudienceStatusBadge from '../../components/ui/AudienceStatusBadge'
 import PVStatusBadge from '../../components/ui/PVStatusBadge'
@@ -42,24 +36,10 @@ export default function AudienceDetail() {
     }
   }
 
-  // "Mise en délibéré" n'a pas de statut dédié dans le schéma actuel
-  // (StatutAudience: PROGRAMMEE/EN_COURS/CLOTUREE/RENVOYEE). On ferme
-  // l'audience comme pour un jugement rendu, sans changer le statut du
-  // dossier - approximation à revoir si un vrai statut "en délibéré"
-  // est ajouté au modèle plus tard.
   async function enregistrerDecision(type) {
     try {
-      if (type === 'renvoi') {
-        const updated = await renvoyerAudience(id)
-        setAudience((a) => ({ ...a, statut: updated.statut }))
-      } else if (type === 'jugement') {
-        const updated = await fermerAudience(id)
-        await updateStatutDossier(audience.id_dossier, 'JUGE')
-        setAudience((a) => ({ ...a, statut: updated.statut }))
-      } else if (type === 'delibere') {
-        const updated = await fermerAudience(id)
-        setAudience((a) => ({ ...a, statut: updated.statut }))
-      }
+      const updated = await cloturerAudience(id, type)
+      setAudience((a) => ({ ...a, statut: updated.statut }))
       setDecision(type)
       setShowDecision(false)
     } catch {

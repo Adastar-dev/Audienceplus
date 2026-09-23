@@ -13,11 +13,12 @@ class Audience extends Model
 
     protected $fillable = [
         'id_dossier', 'id_juge', 'id_salle', 'date_heure', 'mode', 'statut',
-        'type_decision', 'motif_decision',
+        'type_decision', 'motif_decision', 'juge_connecte',
     ];
 
     protected $casts = [
         'date_heure' => 'datetime',
+        'juge_connecte' => 'boolean',
     ];
 
     public function dossier()

@@ -34,4 +34,14 @@ return [
         'api_key' => env('OPENAI_API_KEY'),
     ],
 
+    // Serveur Jitsi auto-heberge avec authentification JWT. Sans secret, on
+    // retombe sur meet.jit.si (sans controle du role de modérateur).
+    'jitsi' => [
+        'domain' => env('JITSI_DOMAIN', 'localhost:8443'),
+        'app_id' => env('JITSI_APP_ID', 'audiences_judiciaires'),
+        'app_secret' => env('JITSI_APP_SECRET'),
+        'audience' => env('JITSI_JWT_AUDIENCE', 'jitsi'),
+        'xmpp_domain' => env('JITSI_XMPP_DOMAIN', 'meet.jitsi'),
+    ],
+
 ];

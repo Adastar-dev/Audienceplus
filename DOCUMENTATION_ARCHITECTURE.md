@@ -52,8 +52,9 @@ La vérification de l'identité du participant repose sur un code de vérificati
 ## Connexion à une audience à distance (Jitsi Meet)
 
 1. Le justiciable ou l'avocat formule une demande de connexion.
-2. Le backend Laravel vérifie que l'utilisateur est bien partie au dossier, que son identité a été vérifiée et que l'audience est effectivement programmée, puis génère le nom de la salle Jitsi correspondante.
-3. Justiciable/avocat et juge/greffier rejoignent la même salle et établissent une connexion audio/vidéo WebRTC directe.
+2. Le juge ouvre l'audience puis entre dans la salle : le backend lui délivre un jeton JWT signé avec le rôle de modérateur. Une fois connecté, il active la salle d'attente et le backend enregistre sa présence.
+3. Le backend vérifie que l'utilisateur est bien partie au dossier, que l'audience est en cours et que le juge est présent, puis lui délivre un jeton JWT de simple participant pour cette salle uniquement.
+4. Le serveur Jitsi auto-hébergé refuse toute connexion sans jeton valide. Le rôle de modérateur provient uniquement du jeton, et non de l'ordre d'arrivée : seul le juge est hôte de l'audience.
 
 ## Choix technologiques
 

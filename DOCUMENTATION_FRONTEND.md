@@ -46,7 +46,7 @@ Dashboard, Utilisateurs, Tribunaux, Logs, ParametresSecurite
 
 ## Intégration Jitsi Meet
 
-Un composant dédié permet de rejoindre une audience à distance sans quitter la plateforme. Le backend génère le nom de la salle et vérifie le rôle de l'utilisateur (partie au dossier, identité vérifiée, audience programmée) avant d'autoriser l'accès. L'utilisateur final accède à l'audience depuis un simple navigateur (ordinateur ou smartphone), sans installation d'un logiciel tiers.
+Un composant dédié permet de rejoindre une audience à distance sans quitter la plateforme. Avant d'afficher la visioconférence, la page demande au backend un jeton JWT (`GET /audiences/{id}/jitsi-jeton`) qui fixe la salle et le rôle de l'utilisateur : modérateur pour le juge, participant pour les autres. Les participants patientent sur un écran d'attente tant que le juge n'est pas entré dans la salle. L'utilisateur final accède à l'audience depuis un simple navigateur (ordinateur ou smartphone), sans installation d'un logiciel tiers.
 
 ## Stack technique
 
