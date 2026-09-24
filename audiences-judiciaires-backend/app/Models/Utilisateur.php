@@ -2,14 +2,12 @@
 
 namespace App\Models;
 
-use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
 class Utilisateur extends Authenticatable
 {
-    use HasApiTokens, HasFactory;
+    use HasApiTokens;
 
     protected $table = 'utilisateurs';
     protected $primaryKey = 'id_utilisateur';
@@ -42,11 +40,6 @@ class Utilisateur extends Authenticatable
         return $this->belongsTo(Tribunal::class, 'id_tribunal', 'id_tribunal');
     }
 
-    public function piecesDeposees()
-    {
-        return $this->hasMany(Piece::class, 'depose_par', 'id_utilisateur');
-    }
-
     public function participations()
     {
         return $this->hasMany(ParticipationAudience::class, 'id_utilisateur', 'id_utilisateur');
@@ -70,10 +63,5 @@ class Utilisateur extends Authenticatable
     public function notifications()
     {
         return $this->hasMany(Notification::class, 'id_utilisateur', 'id_utilisateur');
-    }
-
-    public function audiencesJugees()
-    {
-        return $this->hasMany(Audience::class, 'id_juge', 'id_utilisateur');
     }
 }

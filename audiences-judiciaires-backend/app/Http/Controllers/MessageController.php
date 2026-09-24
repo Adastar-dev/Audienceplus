@@ -26,7 +26,7 @@ class MessageController extends Controller
         if (! $this->conversationAutorisee($moi, $autre)) {
             return response()->json([
                 'errors' => ['avec' => ['Vous ne pouvez pas consulter cette conversation.']],
-            ], 422);
+            ], 403);
         }
 
         $messages = Message::where(function ($q) use ($moi, $autre) {
@@ -55,7 +55,7 @@ class MessageController extends Controller
         if (! $this->conversationAutorisee($expediteur, $destinataire)) {
             return response()->json([
                 'errors' => ['id_destinataire' => ['Vous ne pouvez pas contacter cet utilisateur.']],
-            ], 422);
+            ], 403);
         }
 
         $message = Message::create([

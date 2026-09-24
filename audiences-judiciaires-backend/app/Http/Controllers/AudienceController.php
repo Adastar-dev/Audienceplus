@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Audience;
 use App\Models\Convocation;
-use App\Models\Dossier;
 use App\Models\ParticipationAudience;
 use App\Models\SalleVirtuelle;
 use App\Models\Utilisateur;
@@ -153,6 +152,22 @@ class AudienceController extends Controller
             if (! $audience->juge_connecte) {
                 return response()->json(['message' => "Le juge n'a pas encore ouvert la salle."], 409);
             }
+
+            // Le code OTP de la salle d'attente est aussi exigé ici, et pas
+            // seulement par l'interface : sinon un appel direct à l'API
+            // permettrait d'entrer sans vérification d'identité.
+            if ($utilisateur->role === 'JUSTICIABLE') {
+                $identiteConfirmee = ParticipationAudience::where('id_audience', $audience->id_audience)
+                    ->where('id_utilisateur', $utilisateur->id_utilisateur)
+                    ->where('identite_confirmee_otp', true)
+                    ->exists();
+
+                if (! $identiteConfirmee) {
+                    return response()->json([
+                        'message' => "Confirmez d'abord votre identité avec le code reçu par SMS, dans la salle d'attente.",
+                    ], 403);
+                }
+            }
         }
 
         return response()->json([
@@ -197,15 +212,6 @@ class AudienceController extends Controller
             $audience->dossier()->update(['statut' => 'JUGE']);
             $this->notifierDecision($audience, 'Le jugement a été rendu. La décision est disponible.');
         }
-
-        return response()->json($audience->load('dossier'));
-    }
-
-    public function renvoyer(Audience $audience)
-    {
-        $audience->update(['statut' => 'RENVOYEE', 'type_decision' => 'RENVOI', 'juge_connecte' => false]);
-        $audience->dossier()->update(['statut' => 'RENVOYE']);
-        $this->notifierDecision($audience, "L'audience a été renvoyée à une date ultérieure.");
 
         return response()->json($audience->load('dossier'));
     }

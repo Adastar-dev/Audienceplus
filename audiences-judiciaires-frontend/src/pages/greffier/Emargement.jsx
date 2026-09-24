@@ -5,6 +5,29 @@ import { getAudienceById } from '../../services/api/audiences'
 import { listerParticipants, marquerPresent, marquerAbsent } from '../../services/api/participants'
 import { ROLE_LABELS } from '../../constants/enums'
 
+// Indicateurs de la salle d'attente, pour aider le greffier : le code SMS est
+// le seul verrou ; la lecture OCR du numéro de CNI n'est qu'indicative.
+function IndicateursIdentite({ participation }) {
+  if (!['JUSTICIABLE', 'AVOCAT'].includes(participation.role_audience)) return null
+
+  const ocr = !participation.cni_photo_path
+    ? { texte: 'CNI : pas de photo', ton: 'text-slate-400' }
+    : participation.numero_cni_concorde === true
+      ? { texte: 'CNI : numéro concordant', ton: 'text-success-700' }
+      : participation.numero_cni_concorde === false
+        ? { texte: 'CNI : numéro différent', ton: 'text-danger-700' }
+        : { texte: 'CNI : numéro non lu', ton: 'text-gold-600' }
+
+  return (
+    <p className="text-xs mt-0.5 flex gap-3">
+      <span className={participation.identite_confirmee_otp ? 'text-success-700' : 'text-slate-400'}>
+        {participation.identite_confirmee_otp ? 'Code SMS confirmé' : 'Code SMS non confirmé'}
+      </span>
+      <span className={ocr.ton}>{ocr.texte}</span>
+    </p>
+  )
+}
+
 export default function Emargement() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -27,7 +50,7 @@ export default function Emargement() {
   async function handleMarquerPresent(idParticipation) {
     setEnCours(idParticipation)
     try {
-      const { participation } = await marquerPresent(id, idParticipation)
+      await marquerPresent(id, idParticipation)
       setParticipants((list) =>
         list.map((p) => (p.id_participation === idParticipation ? { ...p, present: true } : p)),
       )
@@ -90,6 +113,7 @@ export default function Emargement() {
             <div>
               <p className="text-sm font-medium text-navy-900">{p.utilisateur?.nom}</p>
               <p className="text-xs text-slate-400">{ROLE_LABELS[p.role_audience] ?? p.role_audience}</p>
+              <IndicateursIdentite participation={p} />
             </div>
 
             {p.present ? (

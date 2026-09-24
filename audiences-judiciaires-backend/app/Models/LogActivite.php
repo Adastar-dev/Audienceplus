@@ -2,12 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class LogActivite extends Model
 {
-    use HasFactory;
 
     protected $table = 'logs_activite';
     protected $primaryKey = 'id_log';

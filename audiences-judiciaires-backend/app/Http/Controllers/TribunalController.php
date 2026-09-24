@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\SalleVirtuelle;
 use App\Models\Tribunal;
+use App\Services\JitsiTokenService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -28,10 +29,14 @@ class TribunalController extends Controller
 
         $tribunal = Tribunal::create($request->only('nom', 'ville'));
 
+        // Lien indicatif : l'accès réel passe par le jeton JWT délivré pour
+        // chaque audience (AudienceController::jetonJitsi).
+        $domaineJitsi = app(JitsiTokenService::class)->domaine();
+
         for ($i = 1; $i <= $request->salles_virtuelles; $i++) {
             SalleVirtuelle::create([
                 'id_tribunal' => $tribunal->id_tribunal,
-                'lien_jitsi' => "meet.jit.si/aj-{$tribunal->id_tribunal}-salle{$i}",
+                'lien_jitsi' => "{$domaineJitsi}/aj-{$tribunal->id_tribunal}-salle{$i}",
                 'code_acces' => str()->random(8),
             ]);
         }

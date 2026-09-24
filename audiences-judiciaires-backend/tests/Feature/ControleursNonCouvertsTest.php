@@ -111,7 +111,7 @@ class ControleursNonCouvertsTest extends TestCase
             'id_destinataire' => $justiciable->id_utilisateur, 'contenu' => 'Test.',
         ]);
 
-        $reponse->assertStatus(422);
+        $reponse->assertStatus(403);
     }
 
     public function test_un_justiciable_ne_peut_pas_acceder_a_la_messagerie(): void
@@ -217,6 +217,34 @@ class ControleursNonCouvertsTest extends TestCase
 
         $reponse->assertStatus(204);
         $this->assertDatabaseMissing('utilisateurs', ['id_utilisateur' => $greffier->id_utilisateur]);
+    }
+
+    public function test_un_administrateur_ne_peut_pas_supprimer_son_propre_compte(): void
+    {
+        $admin = $this->creerUtilisateur('ADMINISTRATEUR');
+
+        $this->actingAs($admin, 'sanctum')
+            ->deleteJson("/api/utilisateurs/{$admin->id_utilisateur}")
+            ->assertStatus(422);
+    }
+
+    public function test_un_compte_lie_a_une_audience_ne_peut_pas_etre_supprime(): void
+    {
+        $admin = $this->creerUtilisateur('ADMINISTRATEUR');
+        $juge = $this->creerUtilisateur('JUGE');
+        $dossier = Dossier::create([
+            'numero' => 'TRB-TEST-'.uniqid(), 'type' => 'DIVORCE', 'statut' => 'EN_COURS',
+            'parties' => 'X c. Y', 'id_tribunal' => $this->tribunal()->id_tribunal, 'date_creation' => now(),
+        ]);
+        Audience::create([
+            'id_dossier' => $dossier->id_dossier, 'id_juge' => $juge->id_utilisateur,
+            'date_heure' => now()->addDay(), 'mode' => 'PRESENTIEL', 'statut' => 'PROGRAMMEE',
+        ]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->deleteJson("/api/utilisateurs/{$juge->id_utilisateur}")
+            ->assertStatus(409);
+        $this->assertDatabaseHas('utilisateurs', ['id_utilisateur' => $juge->id_utilisateur]);
     }
 
     public function test_un_non_administrateur_ne_peut_pas_gerer_les_comptes(): void

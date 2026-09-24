@@ -21,8 +21,3 @@ export async function register(payload) {
 export async function logout() {
   await apiClient.post('/logout')
 }
-
-export async function getUtilisateurConnecte() {
-  const { data } = await apiClient.get('/utilisateur')
-  return data
-}

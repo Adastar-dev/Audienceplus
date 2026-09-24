@@ -46,6 +46,58 @@ class DossierPartiesTest extends TestCase
         ]);
     }
 
+    public function test_le_meme_avocat_des_deux_cotes_est_refuse_sans_creer_de_dossier(): void
+    {
+        Mail::fake();
+        Http::fake();
+
+        $greffier = $this->creerUtilisateur('GREFFIER');
+        $demandeur = $this->creerUtilisateur('JUSTICIABLE');
+        $defendeur = $this->creerUtilisateur('JUSTICIABLE');
+        $avocat = $this->creerUtilisateur('AVOCAT');
+        $tribunal = $this->tribunal();
+
+        $reponse = $this->actingAs($greffier, 'sanctum')->postJson('/api/dossiers', [
+            'type' => 'DIVORCE',
+            'id_tribunal' => $tribunal->id_tribunal,
+            'demandeur' => 'Aïda Ndiaye',
+            'defendeur' => 'Un Autre',
+            'id_demandeur_utilisateur' => $demandeur->id_utilisateur,
+            'id_demandeur_avocat' => $avocat->id_utilisateur,
+            'id_defendeur_utilisateur' => $defendeur->id_utilisateur,
+            'id_defendeur_avocat' => $avocat->id_utilisateur,
+        ]);
+
+        $reponse->assertStatus(422)->assertJsonValidationErrors('parties');
+        $this->assertEquals(0, Dossier::count());
+    }
+
+    public function test_la_numerotation_saute_un_numero_deja_pris(): void
+    {
+        Mail::fake();
+        Http::fake();
+
+        $greffier = $this->creerUtilisateur('GREFFIER');
+        $tribunal = $this->tribunal();
+        $annee = now()->year;
+
+        // Un seul dossier cette année, mais il porte déjà le numéro 0002
+        // (comme après la suppression du dossier 0001).
+        Dossier::create([
+            'numero' => sprintf('TRB-DKR-%d-0002', $annee), 'type' => 'DIVORCE', 'statut' => 'EN_COURS',
+            'parties' => 'A c. B', 'id_tribunal' => $tribunal->id_tribunal, 'date_creation' => now(),
+        ]);
+
+        $reponse = $this->actingAs($greffier, 'sanctum')->postJson('/api/dossiers', [
+            'type' => 'ADOPTION',
+            'id_tribunal' => $tribunal->id_tribunal,
+            'demandeur' => 'C',
+            'defendeur' => 'D',
+        ]);
+
+        $reponse->assertStatus(201)->assertJsonPath('numero', sprintf('TRB-DKR-%d-0003', $annee));
+    }
+
     public function test_programmer_une_audience_convoque_automatiquement_les_parties_liees(): void
     {
         Mail::fake();

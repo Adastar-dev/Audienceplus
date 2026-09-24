@@ -2,12 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Convocation extends Model
 {
-    use HasFactory;
 
     protected $primaryKey = 'id_convocation';
 
@@ -35,10 +33,5 @@ class Convocation extends Model
     public function greffierQuiADonneAvis()
     {
         return $this->belongsTo(Utilisateur::class, 'avis_greffier_par', 'id_utilisateur');
-    }
-
-    public function jugeQuiADecide()
-    {
-        return $this->belongsTo(Utilisateur::class, 'decide_par', 'id_utilisateur');
     }
 }

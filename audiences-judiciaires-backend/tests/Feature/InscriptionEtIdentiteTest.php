@@ -115,14 +115,9 @@ class InscriptionEtIdentiteTest extends TestCase
         ]);
         $audience = $this->audienceDeTest();
 
-        $this->actingAs($justiciable, 'sanctum')->postJson(
+        $reponse = $this->actingAs($justiciable, 'sanctum')->postJson(
             "/api/audiences/{$audience->id_audience}/verification-identite/cni",
             ['cni' => UploadedFile::fake()->image('cni.jpg', 400, 250)]
-        );
-
-        $reponse = $this->actingAs($justiciable, 'sanctum')->postJson(
-            "/api/audiences/{$audience->id_audience}/verification-identite/selfie",
-            ['selfie' => UploadedFile::fake()->image('selfie.jpg', 400, 400)]
         );
 
         $reponse->assertOk();
@@ -141,14 +136,9 @@ class InscriptionEtIdentiteTest extends TestCase
         ]);
         $audience = $this->audienceDeTest();
 
-        $this->actingAs($justiciable, 'sanctum')->postJson(
+        $reponse = $this->actingAs($justiciable, 'sanctum')->postJson(
             "/api/audiences/{$audience->id_audience}/verification-identite/cni",
             ['cni' => UploadedFile::fake()->image('cni.jpg', 400, 250)]
-        );
-
-        $reponse = $this->actingAs($justiciable, 'sanctum')->postJson(
-            "/api/audiences/{$audience->id_audience}/verification-identite/selfie",
-            ['selfie' => UploadedFile::fake()->image('selfie.jpg', 400, 400)]
         );
 
         $reponse->assertOk();
@@ -161,14 +151,9 @@ class InscriptionEtIdentiteTest extends TestCase
         $justiciable = $this->creerUtilisateur('JUSTICIABLE');
         $audience = $this->audienceDeTest();
 
-        $this->actingAs($justiciable, 'sanctum')->postJson(
+        $reponse = $this->actingAs($justiciable, 'sanctum')->postJson(
             "/api/audiences/{$audience->id_audience}/verification-identite/cni",
             ['cni' => UploadedFile::fake()->image('cni.jpg', 400, 250)]
-        );
-
-        $reponse = $this->actingAs($justiciable, 'sanctum')->postJson(
-            "/api/audiences/{$audience->id_audience}/verification-identite/selfie",
-            ['selfie' => UploadedFile::fake()->image('selfie.jpg', 400, 400)]
         );
 
         $reponse->assertOk();

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { listerUtilisateurs, creerUtilisateur, updateUtilisateur, verifierIdentiteUtilisateur } from '../../services/api/utilisateurs'
+import { listerUtilisateurs, creerUtilisateur, updateUtilisateur, verifierIdentiteUtilisateur, supprimerUtilisateur } from '../../services/api/utilisateurs'
 import { Role, ROLE_LABELS } from '../../constants/enums'
 import Badge from '../../components/ui/Badge'
-import { ShieldCheck, ShieldAlert, Plus, Pencil, X, Loader2 } from 'lucide-react'
+import { ShieldCheck, ShieldAlert, Plus, Pencil, X, Loader2, Trash2 } from 'lucide-react'
 
 const VIDE = { nom: '', email: '', role: Role.JUSTICIABLE, telephone: '', cni: '', numero_barreau: '' }
 
@@ -57,6 +57,17 @@ export default function Utilisateurs() {
       }
     } catch {
       setErreur("Impossible d'enregistrer l'utilisateur.")
+    }
+  }
+
+  async function supprimer(u) {
+    if (!window.confirm(`Supprimer définitivement le compte de ${u.nom} ?`)) return
+    setErreur('')
+    try {
+      await supprimerUtilisateur(u.id_utilisateur)
+      setUtilisateurs((list) => list.filter((x) => x.id_utilisateur !== u.id_utilisateur))
+    } catch (err) {
+      setErreur(err.response?.data?.message || 'Impossible de supprimer ce compte.')
     }
   }
 
@@ -140,6 +151,13 @@ export default function Utilisateurs() {
                         <ShieldCheck size={15} />
                       </button>
                     )}
+                    <button
+                      onClick={() => supprimer(u)}
+                      title="Supprimer le compte"
+                      className="text-slate-400 hover:text-danger-700 ml-2"
+                    >
+                      <Trash2 size={15} />
+                    </button>
                   </td>
                 </tr>
               ))}

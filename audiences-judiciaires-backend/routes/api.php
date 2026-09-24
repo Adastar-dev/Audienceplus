@@ -42,7 +42,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/audiences', [AudienceController::class, 'store'])->middleware('role:GREFFIER');
     Route::post('/audiences/{audience}/ouvrir', [AudienceController::class, 'ouvrir'])->middleware('role:JUGE');
     Route::post('/audiences/{audience}/fermer', [AudienceController::class, 'fermer'])->middleware('role:JUGE');
-    Route::post('/audiences/{audience}/renvoyer', [AudienceController::class, 'renvoyer'])->middleware('role:JUGE');
     Route::get('/audiences/{audience}/jitsi-jeton', [AudienceController::class, 'jetonJitsi']);
     Route::post('/audiences/{audience}/juge-connecte', [AudienceController::class, 'jugeConnecte'])->middleware('role:JUGE');
     Route::post('/audiences/{audience}/juge-deconnecte', [AudienceController::class, 'jugeDeconnecte'])->middleware('role:JUGE');
@@ -53,11 +52,9 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('role:JUGE');
 
     Route::get('/audiences/{audience}/participants', [ParticipationController::class, 'index']);
-    Route::post('/audiences/{audience}/verification-identite/selfie', [ParticipationController::class, 'enregistrerSelfie'])->middleware('throttle:10,1');
     Route::post('/audiences/{audience}/verification-identite/cni', [ParticipationController::class, 'enregistrerCni'])->middleware('throttle:10,1');
     Route::post('/audiences/{audience}/verification-identite/otp/envoyer', [ParticipationController::class, 'envoyerOtp'])->middleware('throttle:3,1');
     Route::post('/audiences/{audience}/verification-identite/otp/verifier', [ParticipationController::class, 'verifierOtp'])->middleware('throttle:5,1');
-    Route::get('/audiences/{audience}/participants/{participation}/selfie', [ParticipationController::class, 'selfie']);
     Route::get('/audiences/{audience}/participants/{participation}/cni', [ParticipationController::class, 'cniPhoto']);
     Route::post('/audiences/{audience}/participants/{participation}/marquer-present', [ParticipationController::class, 'marquerPresent'])
         ->middleware('role:GREFFIER');

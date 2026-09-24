@@ -7,6 +7,7 @@ use App\Models\PartieDossier;
 use App\Models\Utilisateur;
 use App\Services\NotificationDispatcher;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 class DossierController extends Controller
@@ -61,22 +62,49 @@ class DossierController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $annee = now()->year;
-        $sequence = Dossier::whereYear('date_creation', $annee)->count() + 1;
-        $numero = sprintf('TRB-DKR-%d-%04d', $annee, $sequence);
-
-        $dossier = Dossier::create([
-            'numero' => $numero,
-            'type' => $request->type,
-            'statut' => 'EN_COURS',
-            'parties' => "{$request->demandeur} c. {$request->defendeur}",
-            'id_tribunal' => $request->id_tribunal,
-            'id_procureur' => $request->id_procureur,
-            'date_creation' => now(),
+        // Une même personne ne peut figurer qu'une fois dans un dossier (contrainte
+        // unique sur parties_dossier) : typiquement, un avocat ne peut pas
+        // représenter à la fois le demandeur et le défendeur.
+        $idsParties = array_filter([
+            $request->id_demandeur_utilisateur, $request->id_demandeur_avocat,
+            $request->id_defendeur_utilisateur, $request->id_defendeur_avocat,
         ]);
 
-        $this->lierPartie($dossier, 'DEMANDEUR', $request->id_demandeur_utilisateur, $request->id_demandeur_avocat);
-        $this->lierPartie($dossier, 'DEFENDEUR', $request->id_defendeur_utilisateur, $request->id_defendeur_avocat);
+        if (count($idsParties) !== count(array_unique($idsParties))) {
+            return response()->json(['errors' => ['parties' => [
+                'Une même personne ne peut pas figurer deux fois dans le dossier (par exemple, le même avocat pour le demandeur et le défendeur).',
+            ]]], 422);
+        }
+
+        // Transaction : si la liaison d'une partie échoue, le dossier n'est pas
+        // créé à moitié.
+        $dossier = DB::transaction(function () use ($request) {
+            $annee = now()->year;
+            $sequence = Dossier::whereYear('date_creation', $annee)->count() + 1;
+            $numero = sprintf('TRB-DKR-%d-%04d', $annee, $sequence);
+
+            // Le comptage ne suffit pas si un dossier a été supprimé : on
+            // avance jusqu'au premier numéro libre (la colonne est unique).
+            while (Dossier::where('numero', $numero)->lockForUpdate()->exists()) {
+                $sequence++;
+                $numero = sprintf('TRB-DKR-%d-%04d', $annee, $sequence);
+            }
+
+            $dossier = Dossier::create([
+                'numero' => $numero,
+                'type' => $request->type,
+                'statut' => 'EN_COURS',
+                'parties' => "{$request->demandeur} c. {$request->defendeur}",
+                'id_tribunal' => $request->id_tribunal,
+                'id_procureur' => $request->id_procureur,
+                'date_creation' => now(),
+            ]);
+
+            $this->lierPartie($dossier, 'DEMANDEUR', $request->id_demandeur_utilisateur, $request->id_demandeur_avocat);
+            $this->lierPartie($dossier, 'DEFENDEUR', $request->id_defendeur_utilisateur, $request->id_defendeur_avocat);
+
+            return $dossier;
+        });
 
         if ($request->id_procureur) {
             $this->notifierProcureurAssigne($dossier);

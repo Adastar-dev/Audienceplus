@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ShieldCheck, Loader2 } from 'lucide-react'
+import { ShieldCheck, Loader2, IdCard } from 'lucide-react'
 import { getAudienceById } from '../../services/api/audiences'
-import { envoyerOtp, verifierOtp } from '../../services/api/participations'
+import { envoyerOtp, verifierOtp, envoyerPhotoCni } from '../../services/api/participations'
 
-// Verification d'identite par code a 6 chiffres envoye par SMS (remplace la
-// comparaison faciale Face++, retiree - voir OtpService cote backend).
+// Verification d'identite en deux etapes : photo de la CNI (numero lu par OCR,
+// indicateur pour le greffier, jamais bloquant) puis code a 6 chiffres envoye
+// par SMS (seul verrou, verifie aussi par le backend avant l'acces a Jitsi).
+// Remplace la comparaison faciale Face++, retiree.
 export default function SalleAttente() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -16,6 +18,9 @@ export default function SalleAttente() {
   const [envoi, setEnvoi] = useState(false)
   const [verification, setVerification] = useState(false)
   const [codeEnvoye, setCodeEnvoye] = useState(false)
+  const [photoCni, setPhotoCni] = useState(null)
+  const [cniEnvoyee, setCniEnvoyee] = useState(false)
+  const [envoiCni, setEnvoiCni] = useState(false)
   const [erreur, setErreur] = useState('')
 
   useEffect(() => {
@@ -24,6 +29,25 @@ export default function SalleAttente() {
       .catch(() => setAudience(null))
       .finally(() => setChargement(false))
   }, [id])
+
+  async function handleEnvoyerCni(e) {
+    e.preventDefault()
+    if (!photoCni) return
+    setErreur('')
+    setEnvoiCni(true)
+    try {
+      await envoyerPhotoCni(id, photoCni)
+      setCniEnvoyee(true)
+    } catch (err) {
+      setErreur(
+        err.response?.data?.errors
+          ? Object.values(err.response.data.errors).flat().join(' ')
+          : err.response?.data?.message || "Impossible d'envoyer la photo de la CNI.",
+      )
+    } finally {
+      setEnvoiCni(false)
+    }
+  }
 
   async function handleEnvoyerCode() {
     setErreur('')
@@ -124,9 +148,32 @@ export default function SalleAttente() {
               Entrer dans la salle d'audience
             </button>
           </div>
+        ) : !cniEnvoyee ? (
+          <form onSubmit={handleEnvoyerCni} className="text-center">
+            <IdCard size={32} className="mx-auto text-navy-700 mb-3" />
+            <p className="text-sm font-medium text-navy-900 mb-1">Étape 1 sur 2 : votre pièce d'identité</p>
+            <p className="text-sm text-slate-600 mb-4">
+              Prenez en photo le recto de votre carte nationale d'identité, numéro bien lisible.
+            </p>
+            <input
+              type="file"
+              accept="image/jpeg,image/png"
+              capture="environment"
+              onChange={(e) => setPhotoCni(e.target.files?.[0] ?? null)}
+              className="w-full text-sm text-slate-600 mb-4 file:mr-3 file:rounded file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm"
+            />
+            <button
+              type="submit"
+              disabled={!photoCni || envoiCni}
+              className="w-full bg-navy-900 text-white text-sm font-medium rounded px-4 py-2 hover:bg-navy-800 disabled:opacity-40 transition-colors"
+            >
+              {envoiCni ? 'Envoi...' : 'Envoyer la photo'}
+            </button>
+          </form>
         ) : !codeEnvoye ? (
           <div className="text-center">
             <ShieldCheck size={32} className="mx-auto text-navy-700 mb-3" />
+            <p className="text-sm font-medium text-navy-900 mb-1">Étape 2 sur 2 : code de vérification</p>
             <p className="text-sm text-slate-600 mb-4">
               Un code à 6 chiffres sera envoyé par SMS au numéro associé à votre compte.
             </p>

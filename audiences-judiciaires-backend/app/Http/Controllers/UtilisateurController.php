@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\PartieDossier;
 use App\Models\Utilisateur;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 
@@ -75,11 +77,46 @@ class UtilisateurController extends Controller
         return response()->json($utilisateur);
     }
 
-    public function destroy(Utilisateur $utilisateur)
+    public function destroy(Request $request, Utilisateur $utilisateur)
     {
-        $utilisateur->delete();
+        if ((int) $utilisateur->id_utilisateur === (int) $request->user()->id_utilisateur) {
+            return response()->json(['message' => 'Vous ne pouvez pas supprimer votre propre compte.'], 422);
+        }
+
+        // Un compte qui a laissé une trace dans la procédure ne peut pas être
+        // supprimé : plusieurs clés étrangères sont en cascade (signatures,
+        // convocations, parties...) et effaceraient l'historique judiciaire.
+        // Seuls les comptes vides (créés par erreur, par exemple) le peuvent.
+        if ($this->aDesTraces($utilisateur)) {
+            return response()->json([
+                'message' => "Ce compte est lié à des dossiers, audiences ou documents et ne peut pas être supprimé.",
+            ], 409);
+        }
+
+        try {
+            $utilisateur->delete();
+        } catch (QueryException) {
+            return response()->json([
+                'message' => "Ce compte est lié à des dossiers ou des audiences et ne peut pas être supprimé.",
+            ], 409);
+        }
 
         return response()->json(null, 204);
+    }
+
+    private function aDesTraces(Utilisateur $utilisateur): bool
+    {
+        $id = $utilisateur->id_utilisateur;
+
+        return DB::table('parties_dossier')->where('id_utilisateur', $id)->exists()
+            || DB::table('audiences')->where('id_juge', $id)->exists()
+            || DB::table('convocations')->where('id_utilisateur', $id)->exists()
+            || DB::table('participations_audience')->where('id_utilisateur', $id)->exists()
+            || DB::table('signatures')->where('id_utilisateur', $id)->exists()
+            || DB::table('demandes_distance')->where('id_utilisateur', $id)->exists()
+            || DB::table('pieces')->where('depose_par', $id)->exists()
+            || DB::table('dossiers')->where('id_procureur', $id)->exists()
+            || DB::table('messages')->where('id_expediteur', $id)->orWhere('id_destinataire', $id)->exists();
     }
 
     // Comptes Avocat/Justiciable en attente de vérification d'identité.

@@ -18,10 +18,11 @@ Audience+ permet la programmation, la tenue et le suivi d'audiences (à distance
 ## Fonctionnalités
 
 - **Authentification** par jeton (Laravel Sanctum), inscription encadrée (CNI pour les justiciables, numéro de barreau pour les avocats), blocage temporaire après tentatives répétées.
-- **Gestion des dossiers** judiciaires avec numérotation automatique (format `TRB-DKR-année-séquence`), visibilité restreinte aux parties et aux rôles institutionnels concernés.
-- **Programmation et déroulement des audiences**, convocations automatiques (SMS/email), attribution dynamique d'une salle Jitsi pour les audiences à distance.
-- **Comparution à distance** : dépôt, approbation/refus des demandes par le greffier.
-- **Rédaction et signature électronique des procès-verbaux**, avec transcription audio automatique (API Whisper d'OpenAI) et cycle de validation greffier → juge.
+- **Gestion des dossiers** judiciaires avec numérotation automatique (format `TRB-DKR-année-séquence`) ; un justiciable ou un avocat ne voit que ses propres dossiers, et seulement une fois son compte vérifié.
+- **Programmation et déroulement des audiences**, convocations automatiques (SMS/email), reports (avis du greffier, décision du juge), attribution dynamique d'une salle Jitsi pour les audiences à distance.
+- **Comparution à distance** : demande motivée du justiciable ou de l'avocat, avis du greffier, décision du juge ; vérification d'identité (OTP + OCR) dans une salle d'attente ouverte 30 minutes avant l'audience.
+- **Visioconférence Jitsi auto-hébergée**, accès par jeton JWT signé ; seul le juge est modérateur et personne n'entre avant lui.
+- **Procès-verbaux** avec transcription audio automatique (API Whisper d'OpenAI), cycle de validation greffier → juge, avis du procureur, contestation par l'avocat, et scellement d'intégrité (empreinte SHA-256 vérifiable).
 - **Messagerie interne** entre les rôles amenés à collaborer sur un dossier (greffier ↔ juge, greffier ↔ procureur, greffier ↔ avocat, procureur ↔ juge, avocat ↔ justiciable).
 - **Notifications** par SMS (API SMS Sénégal d'Orange) et par email (SMTP).
 - **Vérification d'identité** par OTP (SMS) et reconnaissance optique de caractères (OCR) sur les pièces d'identité, à titre indicatif (non bloquant).
@@ -34,7 +35,7 @@ Audience+ permet la programmation, la tenue et le suivi d'audiences (à distance
 | Justiciable | Partie à un dossier, peut demander une comparution à distance, consulter ses décisions, échanger via la messagerie |
 | Avocat | Représente un ou plusieurs justiciables, suit ses dossiers et convocations |
 | Greffier | Crée et gère les dossiers, programme les audiences, rédige les procès-verbaux — rôle disposant de l'espace fonctionnel le plus étendu |
-| Juge | Valide les procès-verbaux, enregistre les décisions (jugement, renvoi, délibéré), consulte les validations du greffier |
+| Juge | Ouvre et ferme l'audience (seul modérateur Jitsi), enregistre les décisions (jugement, renvoi, délibéré), valide les procès-verbaux, tranche les demandes de report et de comparution à distance après l'avis du greffier |
 | Procureur | Enregistre un avis consultatif sur les dossiers qui le justifient (ex. adoption, rectification d'acte) |
 | Administrateur | Gère les comptes utilisateurs, les tribunaux, les journaux et les paramètres de sécurité |
 
@@ -44,7 +45,7 @@ Audience+ permet la programmation, la tenue et le suivi d'audiences (à distance
 - PHP / Laravel — API RESTful
 - Laravel Sanctum — authentification par jeton
 - MySQL — persistance des données, via l'ORM Eloquent
-- Pest/PHPUnit — suite de tests automatisés (103 tests)
+- Pest/PHPUnit — suite de tests automatisés (122 tests)
 
 **Frontend**
 - JavaScript (React), sans TypeScript
@@ -52,9 +53,9 @@ Audience+ permet la programmation, la tenue et le suivi d'audiences (à distance
 - Tailwind CSS — mise en forme, sans bibliothèque de composants tierce
 
 **Services externes**
-- Jitsi Meet — visioconférence sécurisée pour les audiences à distance (auto-hébergeable, open source)
-- API SMS Sénégal d'Orange — envoi de SMS (convocations, rappels, OTP)
-- API Whisper (OpenAI) — transcription automatique des procès-verbaux et OCR sur les pièces d'identité
+- Jitsi Meet — visioconférence des audiences à distance, auto-hébergée dans Docker avec authentification JWT
+- API SMS Sénégal d'Orange — envoi de SMS (convocations, décisions, OTP)
+- API OpenAI — transcription audio des procès-verbaux (Whisper) et lecture OCR du numéro des pièces d'identité
 - SMTP — envoi d'emails
 
 **Outils de développement**
@@ -80,25 +81,48 @@ Voir [DOCUMENTATION_ARCHITECTURE.md](./DOCUMENTATION_ARCHITECTURE.md) pour le d�
 ## Structure du dépôt
 
 ```
-Backend/    API Laravel
-frontend/   Application React
+audiences-judiciaires-backend/    API Laravel
+audiences-judiciaires-frontend/   Application React
+docker-compose.yml                Plateforme complète (API, interface, MySQL, Jitsi)
 ```
 
 ## Installation
 
+### Avec Docker (recommandé)
+
+```bash
+docker compose up -d --build
+docker compose exec app php artisan db:seed   # comptes de démonstration, une seule fois sur une base vide
+```
+
+Au premier démarrage, le conteneur `app` installe les dépendances, crée le `.env`, génère la clé et lance les migrations.
+
+| Service | Adresse |
+|---|---|
+| Interface React | http://localhost:5173 |
+| API Laravel | http://localhost:8000/api |
+| Adminer (base de données) | http://localhost:8080 |
+| Jitsi | https://localhost:8443 (certificat auto-signé à accepter une fois) |
+
+Comptes de démonstration (mot de passe `password`) : `f.diallo@justice.sn` (juge), `m.sy@justice.sn` (greffier), `c.ba@justice.sn` (procureur), `awa.fall@barreau.sn` (avocat), `aida.ndiaye@mail.sn` (justiciable), `admin@justice.sn` (administrateur).
+
+Les secrets par défaut de `docker-compose.yml` (`secret`, `dev-secret-a-changer-en-production`) sont réservés au développement.
+
+### Sans Docker
+
 Backend :
 ```bash
-cd Backend
+cd audiences-judiciaires-backend
 composer install
 cp .env.example .env
 php artisan key:generate
-php artisan migrate
+php artisan migrate --seed
 php artisan serve
 ```
 
 Frontend :
 ```bash
-cd frontend
+cd audiences-judiciaires-frontend
 npm install
 npm run dev
 ```
@@ -106,11 +130,13 @@ npm run dev
 ## Tests
 
 ```bash
-cd Backend
+cd audiences-judiciaires-backend
 php artisan test
 ```
 
-Suite de tests Pest/PHPUnit couvrant l'authentification et le contrôle des rôles, le cycle de vie d'un dossier et d'une audience, la gestion des demandes de comparution à distance, le dépôt/téléchargement des pièces, et l'enregistrement de l'avis du procureur.
+Les tests tournent sur une base SQLite en mémoire. **Ne les lancez pas dans le conteneur Docker** : son environnement impose MySQL. `phpunit.xml` force désormais SQLite et `tests/TestCase.php` refuse de démarrer sur une autre base, mais la règle reste de lancer les tests en local.
+
+La suite couvre l'authentification et le contrôle des rôles, le cycle de vie d'un dossier et d'une audience, les demandes de comparution à distance, la présence du juge avant l'accès à la salle Jitsi, le dépôt/téléchargement des pièces, l'avis du procureur et l'intégrité des signatures. Les tests d'OCR et de signature avec image nécessitent l'extension PHP GD.
 
 ## Documentation
 

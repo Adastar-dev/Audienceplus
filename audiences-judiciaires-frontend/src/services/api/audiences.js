@@ -15,17 +15,12 @@ export async function ouvrirAudience(id) {
   return data
 }
 
-export async function fermerAudience(id) {
+async function fermerAudience(id) {
   const { data } = await apiClient.post(`/audiences/${id}/fermer`)
   return data
 }
 
-export async function renvoyerAudience(id) {
-  const { data } = await apiClient.post(`/audiences/${id}/renvoyer`)
-  return data
-}
-
-export async function deciderAudience(id, type, motif) {
+async function deciderAudience(id, type, motif) {
   const { data } = await apiClient.post(`/audiences/${id}/decider`, { type, motif })
   return data
 }

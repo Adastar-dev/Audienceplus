@@ -95,9 +95,21 @@ export default function RejoindreAudience({ backTo }) {
         ) : erreurSalle ? (
           <div className="w-full h-full flex items-center justify-center text-navy-100 text-sm">{erreurSalle}</div>
         ) : enAttente ? (
-          <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-navy-100 text-sm">
-            <Loader2 size={20} className="animate-spin" />
-            En attente de l'ouverture de la salle par le juge...
+          <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-navy-100 text-sm text-center px-6">
+            <Loader2 size={24} className="animate-spin" />
+            <p className="font-display text-xl text-white">Salle d'attente</p>
+            <p>
+              Audience prévue le{' '}
+              {new Date(audience.date_heure).toLocaleString('fr-FR', {
+                dateStyle: 'long',
+                timeStyle: 'short',
+              })}
+            </p>
+            <p className="max-w-sm">
+              {audience.statut === StatutAudience.PROGRAMMEE
+                ? "L'audience n'est pas encore ouverte. Restez sur cette page : vous entrerez automatiquement dès que le juge l'ouvrira."
+                : "L'audience est ouverte, le juge n'est pas encore entré dans la salle. Vous entrerez automatiquement dès son arrivée."}
+            </p>
           </div>
         ) : (
           <div className="w-full h-full flex items-center justify-center text-navy-100 text-sm">

@@ -75,36 +75,6 @@ class ParticipationController extends Controller
         return response()->json($participation);
     }
 
-    public function enregistrerSelfie(Request $request, Audience $audience)
-    {
-        $validator = Validator::make($request->all(), [
-            'selfie' => 'required|image|mimes:jpg,jpeg,png|max:5120',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
-        }
-
-        $mime = $request->file('selfie')->getMimeType();
-        if (! str_starts_with($mime, 'image/')) {
-            return response()->json(['errors' => ['selfie' => ["Le fichier n'est pas une image valide."]]], 422);
-        }
-
-        $participation = ParticipationAudience::firstOrCreate(
-            ['id_audience' => $audience->id_audience, 'id_utilisateur' => $request->user()->id_utilisateur],
-            ['role_audience' => $request->user()->role]
-        );
-
-        $chemin = $request->file('selfie')->store('selfies-verification', 'local');
-        $participation->update(['selfie_path' => $chemin]);
-
-        if ($participation->cni_photo_path) {
-            $this->comparerPhotos($participation);
-        }
-
-        return response()->json($participation);
-    }
-
     public function enregistrerCni(Request $request, Audience $audience)
     {
         $validator = Validator::make($request->all(), [
@@ -128,9 +98,7 @@ class ParticipationController extends Controller
         $chemin = $request->file('cni')->store('cni-verification', 'local');
         $participation->update(['cni_photo_path' => $chemin]);
 
-        if ($participation->selfie_path) {
-            $this->comparerPhotos($participation);
-        }
+        $this->verifierNumeroCni($participation);
 
         return response()->json($participation);
     }
@@ -138,9 +106,9 @@ class ParticipationController extends Controller
     // Verifie que le numero OCR de la CNI correspond au CNI declare a
     // l'inscription — un indicateur pour le greffier/juge, jamais un blocage
     // automatique (l'OCR se trompe facilement sur une photo prise au telephone).
-    // La comparaison faciale (Face++) a ete retiree au profit d'un code OTP par
-    // SMS, voir envoyerOtp/verifierOtp ci-dessous.
-    private function comparerPhotos(ParticipationAudience $participation): void
+    // La comparaison faciale (Face++) et le selfie ont ete retires au profit d'un
+    // code OTP par SMS, voir envoyerOtp/verifierOtp ci-dessous.
+    private function verifierNumeroCni(ParticipationAudience $participation): void
     {
         $numeroDetecte = $this->cniOcr->extraireNumero(Storage::disk('local')->path($participation->cni_photo_path));
         $numeroDeclare = $participation->utilisateur->cni ?? null;
@@ -195,7 +163,7 @@ class ParticipationController extends Controller
 
         if (! $this->otp->envoyer($participation)) {
             return response()->json([
-                'message' => "Aucun numéro de téléphone n'est associé à votre compte.",
+                'message' => "Aucun numéro de téléphone n'est associé à votre compte. Demandez à l'administrateur de l'ajouter pour recevoir le code.",
             ], 422);
         }
 
@@ -234,23 +202,6 @@ class ParticipationController extends Controller
         }
 
         return response()->json($participation->fresh());
-    }
-
-    public function selfie(Request $request, Audience $audience, ParticipationAudience $participation)
-    {
-        $utilisateur = $request->user();
-        $autorise = in_array($utilisateur->role, ['GREFFIER', 'JUGE', 'ADMINISTRATEUR'], true)
-            || $utilisateur->id_utilisateur === $participation->id_utilisateur;
-
-        if (! $autorise) {
-            abort(403);
-        }
-
-        if (! $participation->selfie_path || ! Storage::disk('local')->exists($participation->selfie_path)) {
-            abort(404);
-        }
-
-        return Storage::disk('local')->response($participation->selfie_path);
     }
 
     public function cniPhoto(Request $request, Audience $audience, ParticipationAudience $participation)

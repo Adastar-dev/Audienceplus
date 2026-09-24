@@ -2,12 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class SalleVirtuelle extends Model
 {
-    use HasFactory;
 
     protected $table = 'salles_virtuelles';
     protected $primaryKey = 'id_salle';

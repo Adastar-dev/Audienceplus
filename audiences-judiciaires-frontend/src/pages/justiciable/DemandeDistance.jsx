@@ -106,7 +106,7 @@ export default function DemandeDistance() {
 
               {demande?.statut === StatutDemandeDistance.APPROUVEE && (
                 <Link
-                  to={`/justiciable/audiences/${a.id_audience}/rejoindre`}
+                  to={`/justiciable/salle-attente/${a.id_audience}`}
                   className="inline-flex items-center gap-1.5 mt-3 text-xs text-navy-900 font-medium hover:underline"
                 >
                   Rejoindre l'audience à distance →

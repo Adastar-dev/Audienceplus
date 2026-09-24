@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ThumbsUp, ThumbsDown, Loader2 } from 'lucide-react'
-import { listerConvocations, donnerAvisReport } from '../../services/api/convocations'
+import { listerConvocations, donnerAvisReport, relancerConvocation } from '../../services/api/convocations'
 import ConvocationStatusBadge from '../../components/ui/ConvocationStatusBadge'
 import { StatutConvocation, CanalNotification } from '../../constants/enums'
 
@@ -33,6 +33,19 @@ export default function Convocations() {
     setTraitementId(id)
     setNouvelleDate('')
     setMotifDefavorable('')
+  }
+
+  async function handleRelancer(id) {
+    setErreur('')
+    setEnCours(true)
+    try {
+      const updated = await relancerConvocation(id)
+      setConvocations((list) => list.map((c) => (c.id_convocation === id ? { ...c, ...updated } : c)))
+    } catch {
+      setErreur("Impossible de relancer cette convocation.")
+    } finally {
+      setEnCours(false)
+    }
   }
 
   async function handleAvisFavorable(id) {
@@ -98,6 +111,16 @@ export default function Convocations() {
                 </div>
                 <div className="flex items-center gap-3">
                   <ConvocationStatusBadge statut={c.statut} />
+                  {c.statut === StatutConvocation.ENVOYEE && (
+                    <button
+                      onClick={() => handleRelancer(c.id_convocation)}
+                      disabled={enCours}
+                      className="text-xs text-navy-900 font-medium hover:underline disabled:opacity-40"
+                      title="Renvoyer la notification (SMS ou email)"
+                    >
+                      Relancer
+                    </button>
+                  )}
                   {c.statut === StatutConvocation.REPORT_DEMANDE && traitementId !== c.id_convocation && (
                     <button
                       onClick={() => ouvrirTraitement(c.id_convocation)}

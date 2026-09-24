@@ -9,6 +9,25 @@ use Illuminate\Support\Facades\Hash;
 
 abstract class TestCase extends BaseTestCase
 {
+    // Garde-fou : RefreshDatabase efface toutes les tables. On refuse de lancer
+    // un test si la connexion n'est pas SQLite en mémoire, pour ne jamais
+    // toucher la base MySQL de développement.
+    public function createApplication()
+    {
+        $app = parent::createApplication();
+
+        $connexion = $app['config']->get('database.default');
+        $base = $app['config']->get("database.connections.{$connexion}.database");
+
+        if ($connexion !== 'sqlite' || $base !== ':memory:') {
+            throw new \RuntimeException(
+                "Tests interrompus : la base configurée est {$connexion} ({$base}) au lieu de SQLite en mémoire."
+            );
+        }
+
+        return $app;
+    }
+
     protected function tribunal(array $overrides = []): Tribunal
     {
         return Tribunal::create(array_merge([

@@ -2,12 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class DemandeDistance extends Model
 {
-    use HasFactory;
 
     protected $table = 'demandes_distance';
     protected $primaryKey = 'id_demande';
@@ -38,10 +36,5 @@ class DemandeDistance extends Model
     public function greffierQuiADonneAvis()
     {
         return $this->belongsTo(Utilisateur::class, 'avis_greffier_par', 'id_utilisateur');
-    }
-
-    public function jugeQuiADecide()
-    {
-        return $this->belongsTo(Utilisateur::class, 'decide_par', 'id_utilisateur');
     }
 }

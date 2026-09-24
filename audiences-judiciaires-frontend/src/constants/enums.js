@@ -103,12 +103,6 @@ export const CanalNotification = {
   IN_APP: 'IN_APP',
 }
 
-export const TypeDocument = {
-  PROCES_VERBAL: 'PROCES_VERBAL',
-  CONVOCATION: 'CONVOCATION',
-  PARTICIPATION: 'PARTICIPATION',
-}
-
 // Libellés lisibles en français pour l'affichage (badges, filtres...)
 export const STATUT_DOSSIER_LABELS = {
   [StatutDossier.EN_COURS]: 'En cours',

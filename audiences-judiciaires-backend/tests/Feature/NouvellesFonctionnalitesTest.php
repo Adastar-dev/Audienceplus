@@ -79,25 +79,25 @@ class NouvellesFonctionnalitesTest extends TestCase
         $reponse->assertStatus(422);
     }
 
-    public function test_un_selfie_valide_est_enregistre_et_rattache_a_lutilisateur_connecte(): void
+    public function test_une_photo_de_cni_valide_est_enregistree_et_rattachee_a_lutilisateur_connecte(): void
     {
         Storage::fake('local');
         $justiciable = $this->creerUtilisateur('JUSTICIABLE');
         $audience = $this->audienceDeTest();
-        $image = UploadedFile::fake()->image('selfie.jpg', 300, 300);
+        $image = UploadedFile::fake()->image('cni.jpg', 300, 300);
 
         $reponse = $this->actingAs($justiciable, 'sanctum')
-            ->postJson("/api/audiences/{$audience->id_audience}/verification-identite/selfie", ['selfie' => $image]);
+            ->postJson("/api/audiences/{$audience->id_audience}/verification-identite/cni", ['cni' => $image]);
 
         $reponse->assertOk();
         $this->assertDatabaseHas('participations_audience', [
             'id_audience' => $audience->id_audience,
             'id_utilisateur' => $justiciable->id_utilisateur,
         ]);
-        $this->assertNotNull($reponse->json('selfie_path'));
+        $this->assertNotNull($reponse->json('cni_photo_path'));
     }
 
-    public function test_un_fichier_deguise_en_image_est_rejete_pour_le_selfie(): void
+    public function test_un_fichier_deguise_en_image_est_rejete_pour_la_cni(): void
     {
         Storage::fake('local');
         $justiciable = $this->creerUtilisateur('JUSTICIABLE');
@@ -108,47 +108,47 @@ class NouvellesFonctionnalitesTest extends TestCase
         $fichier = new UploadedFile($cheminReel, 'malveillant.jpg', 'image/jpeg', null, true);
 
         $reponse = $this->actingAs($justiciable, 'sanctum')
-            ->postJson("/api/audiences/{$audience->id_audience}/verification-identite/selfie", ['selfie' => $fichier]);
+            ->postJson("/api/audiences/{$audience->id_audience}/verification-identite/cni", ['cni' => $fichier]);
 
         $reponse->assertStatus(422);
         @unlink($cheminReel);
     }
 
-    public function test_le_proprietaire_et_le_greffier_peuvent_consulter_un_selfie(): void
+    public function test_le_proprietaire_et_le_greffier_peuvent_consulter_la_photo_de_cni(): void
     {
         Storage::fake('local');
         $justiciable = $this->creerUtilisateur('JUSTICIABLE');
         $greffier = $this->creerUtilisateur('GREFFIER');
         $audience = $this->audienceDeTest();
-        $image = UploadedFile::fake()->image('selfie.jpg', 300, 300);
+        $image = UploadedFile::fake()->image('cni.jpg', 300, 300);
 
         $creation = $this->actingAs($justiciable, 'sanctum')
-            ->postJson("/api/audiences/{$audience->id_audience}/verification-identite/selfie", ['selfie' => $image]);
+            ->postJson("/api/audiences/{$audience->id_audience}/verification-identite/cni", ['cni' => $image]);
         $idParticipation = $creation->json('id_participation');
 
         $this->actingAs($justiciable, 'sanctum')
-            ->get("/api/audiences/{$audience->id_audience}/participants/{$idParticipation}/selfie")
+            ->get("/api/audiences/{$audience->id_audience}/participants/{$idParticipation}/cni")
             ->assertOk();
 
         $this->actingAs($greffier, 'sanctum')
-            ->get("/api/audiences/{$audience->id_audience}/participants/{$idParticipation}/selfie")
+            ->get("/api/audiences/{$audience->id_audience}/participants/{$idParticipation}/cni")
             ->assertOk();
     }
 
-    public function test_un_autre_justiciable_ne_peut_pas_consulter_le_selfie_dautrui(): void
+    public function test_un_autre_justiciable_ne_peut_pas_consulter_la_cni_dautrui(): void
     {
         Storage::fake('local');
         $justiciable = $this->creerUtilisateur('JUSTICIABLE');
         $curieux = $this->creerUtilisateur('JUSTICIABLE');
         $audience = $this->audienceDeTest();
-        $image = UploadedFile::fake()->image('selfie.jpg', 300, 300);
+        $image = UploadedFile::fake()->image('cni.jpg', 300, 300);
 
         $creation = $this->actingAs($justiciable, 'sanctum')
-            ->postJson("/api/audiences/{$audience->id_audience}/verification-identite/selfie", ['selfie' => $image]);
+            ->postJson("/api/audiences/{$audience->id_audience}/verification-identite/cni", ['cni' => $image]);
         $idParticipation = $creation->json('id_participation');
 
         $this->actingAs($curieux, 'sanctum')
-            ->get("/api/audiences/{$audience->id_audience}/participants/{$idParticipation}/selfie")
+            ->get("/api/audiences/{$audience->id_audience}/participants/{$idParticipation}/cni")
             ->assertStatus(403);
     }
 

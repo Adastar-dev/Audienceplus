@@ -31,7 +31,7 @@ La vérification de l'identité du participant repose sur un code de vérificati
 
 ### b. Couche logique métier (backend Laravel)
 - Contrôleurs REST organisés par domaine (dossiers, audiences, pièces, utilisateurs, notifications, participations).
-- Classes de services dédiées aux intégrations externes : `NotificationDispatcher`, `WhisperTranscriptionService`, `CniOcrService`, `FaceComparisonService`.
+- Classes de services dédiées aux intégrations externes : `NotificationDispatcher`, `WhisperTranscriptionService`, `CniOcrService`, `OtpService`, `JitsiTokenService`, `DocumentHashService`.
 - Règles métier propres au contexte judiciaire : contrôle des statuts d'audience, enregistrement de l'avis du procureur, blocage des demandes de comparution à distance sur une audience non programmée.
 
 ### c. Couche persistance (MySQL)
@@ -77,7 +77,7 @@ Authentification par jeton (Sanctum) et contrôle des rôles, complétés par : 
 
 - Développement : XAMPP (Apache, MySQL, PHP) pour le backend, serveur de développement Vite pour le frontend (rechargement à chaud).
 - Tests automatisés : exécutés sur une base de données SQLite en mémoire, isolée de la base MySQL de développement, pour des exécutions rapides et reproductibles.
-- Qualité du code : suite de tests automatisés (Pest/PHPUnit, 103 tests) couvrant l'authentification et le contrôle des rôles, le cycle de vie d'un dossier et d'une audience, la gestion des demandes de comparution à distance, le dépôt/téléchargement des pièces, et l'enregistrement de l'avis du procureur — exécutée à chaque évolution significative du code.
+- Qualité du code : suite de tests automatisés (Pest/PHPUnit, 122 tests) couvrant l'authentification et le contrôle des rôles, le cycle de vie d'un dossier et d'une audience, la gestion des demandes de comparution à distance, le dépôt/téléchargement des pièces, et l'enregistrement de l'avis du procureur — exécutée à chaque évolution significative du code.
 
 ## Architecture de production cible
 

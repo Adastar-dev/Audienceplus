@@ -2,12 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class CasierJudiciaire extends Model
 {
-    use HasFactory;
 
     protected $table = 'casiers_judiciaires';
     protected $primaryKey = 'id_casier';

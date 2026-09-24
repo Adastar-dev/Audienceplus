@@ -49,6 +49,29 @@ class SignatureIntegriteTest extends TestCase
         $this->assertTrue($reponse->json('0.integrite_preservee'));
     }
 
+    public function test_un_autre_role_que_le_juge_ne_peut_pas_signer_le_pv(): void
+    {
+        $avocat = $this->creerUtilisateur('AVOCAT');
+        $pv = $this->pvDeTest();
+
+        $this->actingAs($avocat, 'sanctum')->postJson('/api/signatures', [
+            'type_document' => 'PROCES_VERBAL',
+            'id_document_signe' => $pv->id_pv,
+        ])->assertStatus(403);
+    }
+
+    public function test_un_pv_non_transmis_ne_peut_pas_etre_signe(): void
+    {
+        $juge = $this->creerUtilisateur('JUGE');
+        $pv = $this->pvDeTest();
+        $pv->update(['statut' => 'EN_COURS']);
+
+        $this->actingAs($juge, 'sanctum')->postJson('/api/signatures', [
+            'type_document' => 'PROCES_VERBAL',
+            'id_document_signe' => $pv->id_pv,
+        ])->assertStatus(422);
+    }
+
     public function test_une_alteration_du_pv_apres_signature_est_detectee(): void
     {
         $juge = $this->creerUtilisateur('JUGE');

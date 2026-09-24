@@ -147,6 +147,47 @@ class PresenceJugeSalleTest extends TestCase
             ->assertJsonPath('moderateur', false);
     }
 
+    private function justiciablePartieA(Audience $audience): \App\Models\Utilisateur
+    {
+        $justiciable = $this->creerUtilisateur('JUSTICIABLE');
+        \App\Models\PartieDossier::create([
+            'id_dossier' => $audience->id_dossier,
+            'id_utilisateur' => $justiciable->id_utilisateur,
+            'role_partie' => 'DEMANDEUR',
+        ]);
+
+        return $justiciable;
+    }
+
+    public function test_un_justiciable_sans_otp_confirme_na_pas_de_jeton(): void
+    {
+        config(['services.jitsi.app_secret' => 'secret-de-test']);
+        $audience = $this->audienceDeTest(['juge_connecte' => true]);
+        $justiciable = $this->justiciablePartieA($audience);
+
+        $this->actingAs($justiciable, 'sanctum')
+            ->getJson("/api/audiences/{$audience->id_audience}/jitsi-jeton")
+            ->assertStatus(403);
+    }
+
+    public function test_un_justiciable_avec_otp_confirme_recoit_un_jeton(): void
+    {
+        config(['services.jitsi.app_secret' => 'secret-de-test']);
+        $audience = $this->audienceDeTest(['juge_connecte' => true]);
+        $justiciable = $this->justiciablePartieA($audience);
+        \App\Models\ParticipationAudience::create([
+            'id_audience' => $audience->id_audience,
+            'id_utilisateur' => $justiciable->id_utilisateur,
+            'role_audience' => 'JUSTICIABLE',
+            'identite_confirmee_otp' => true,
+        ]);
+
+        $this->actingAs($justiciable, 'sanctum')
+            ->getJson("/api/audiences/{$audience->id_audience}/jitsi-jeton")
+            ->assertOk()
+            ->assertJsonPath('moderateur', false);
+    }
+
     public function test_un_avocat_etranger_au_dossier_na_pas_de_jeton(): void
     {
         config(['services.jitsi.app_secret' => 'secret-de-test']);

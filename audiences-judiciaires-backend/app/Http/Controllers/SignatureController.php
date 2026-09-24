@@ -2,7 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Convocation;
+use App\Models\ParticipationAudience;
+use App\Models\ProcesVerbal;
 use App\Models\Signature;
+use App\Models\Utilisateur;
 use App\Services\DocumentHashService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -32,6 +36,10 @@ class SignatureController extends Controller
             return response()->json(['message' => 'Document introuvable.'], 404);
         }
 
+        if ($refus = $this->refuserSiNonAutorise($request->user(), $request->type_document, (int) $request->id_document_signe)) {
+            return $refus;
+        }
+
         $cheminImage = null;
         if ($request->hasFile('signature_image')) {
             $mime = $request->file('signature_image')->getMimeType();
@@ -50,6 +58,39 @@ class SignatureController extends Controller
         ]);
 
         return response()->json($signature->load('utilisateur'), 201);
+    }
+
+    // Qui peut sceller quoi : le PV par le juge de l'audience, une fois transmis
+    // par le greffier ; une convocation ou une participation par la personne
+    // concernée ou par le greffier.
+    private function refuserSiNonAutorise(Utilisateur $utilisateur, string $typeDocument, int $idDocument)
+    {
+        if ($typeDocument === 'PROCES_VERBAL') {
+            $pv = ProcesVerbal::with('audience')->find($idDocument);
+            $audience = $pv?->audience;
+            $estJugeDeLAudience = $utilisateur->role === 'JUGE'
+                && $audience
+                && (! $audience->id_juge || (int) $audience->id_juge === (int) $utilisateur->id_utilisateur);
+
+            if (! $estJugeDeLAudience) {
+                return response()->json(['message' => "Seul le juge de l'audience peut signer ce procès-verbal."], 403);
+            }
+
+            if (! in_array($pv->statut, ['EN_VALIDATION', 'CLOTURE'], true)) {
+                return response()->json(['message' => "Le procès-verbal doit avoir été transmis au juge avant d'être signé."], 422);
+            }
+
+            return null;
+        }
+
+        $document = $typeDocument === 'CONVOCATION'
+            ? Convocation::find($idDocument)
+            : ParticipationAudience::find($idDocument);
+
+        $autorise = $utilisateur->role === 'GREFFIER'
+            || ($document && (int) $document->id_utilisateur === (int) $utilisateur->id_utilisateur);
+
+        return $autorise ? null : response()->json(['message' => "Vous ne pouvez pas signer ce document."], 403);
     }
 
     public function image(Signature $signature)
