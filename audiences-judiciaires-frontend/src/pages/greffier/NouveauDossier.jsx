@@ -4,7 +4,7 @@ import { ArrowLeft, Loader2 } from 'lucide-react'
 import { creerDossier } from '../../services/api/dossiers'
 import { listerTribunaux } from '../../services/api/tribunaux'
 import { listerJusticiables, listerAvocats, listerProcureurs } from '../../services/api/utilisateurs'
-import { TypeAudience, TYPE_AUDIENCE_LABELS } from '../../constants/enums'
+import { TypeAudience, TYPE_AUDIENCE_LABELS, TYPES_SANS_DEFENDEUR, TYPES_AVEC_MINISTERE_PUBLIC } from '../../constants/enums'
 
 export default function NouveauDossier() {
   const navigate = useNavigate()
@@ -42,8 +42,29 @@ export default function NouveauDossier() {
       .finally(() => setChargementTribunaux(false))
   }, [])
 
+  const avecDefendeur = !TYPES_SANS_DEFENDEUR.includes(form.type)
+  const libellePartie = avecDefendeur ? 'Demandeur' : 'Requérant'
+  const avecProcureur = TYPES_AVEC_MINISTERE_PUBLIC.includes(form.type)
+
+  // Une personne choisie d'un côté n'est plus proposée de l'autre côté.
+  const justiciablesDemandeur = justiciables.filter((j) => String(j.id_utilisateur) !== String(form.id_defendeur_utilisateur))
+  const justiciablesDefendeur = justiciables.filter((j) => String(j.id_utilisateur) !== String(form.id_demandeur_utilisateur))
+  const avocatsDemandeur = avocats.filter((a) => String(a.id_utilisateur) !== String(form.id_defendeur_avocat))
+  const avocatsDefendeur = avocats.filter((a) => String(a.id_utilisateur) !== String(form.id_demandeur_avocat))
+
   function update(field, value) {
     setForm((f) => ({ ...f, [field]: value }))
+  }
+
+  // Procédure gracieuse : on efface ce qui avait été saisi pour le défendeur.
+  function updateType(type) {
+    setForm((f) => {
+      const suivant = TYPES_SANS_DEFENDEUR.includes(type)
+        ? { ...f, type, defendeur: '', id_defendeur_utilisateur: '', id_defendeur_avocat: '' }
+        : { ...f, type }
+      // Procureur seulement pour les dossiers communiqués au ministère public.
+      return TYPES_AVEC_MINISTERE_PUBLIC.includes(type) ? suivant : { ...suivant, id_procureur: '' }
+    })
   }
 
   // Quand un justiciable est choisi dans la liste, on préremplit le champ texte
@@ -66,9 +87,10 @@ export default function NouveauDossier() {
         ...form,
         id_demandeur_utilisateur: form.id_demandeur_utilisateur || null,
         id_demandeur_avocat: form.id_demandeur_avocat || null,
-        id_defendeur_utilisateur: form.id_defendeur_utilisateur || null,
-        id_defendeur_avocat: form.id_defendeur_avocat || null,
-        id_procureur: form.id_procureur || null,
+        defendeur: avecDefendeur ? form.defendeur : null,
+        id_defendeur_utilisateur: avecDefendeur ? form.id_defendeur_utilisateur || null : null,
+        id_defendeur_avocat: avecDefendeur ? form.id_defendeur_avocat || null : null,
+        id_procureur: avecProcureur ? form.id_procureur || null : null,
       }
       const nouveauDossier = await creerDossier(payload)
       navigate(`/greffier/dossiers/${nouveauDossier.id_dossier}`)
@@ -119,7 +141,7 @@ export default function NouveauDossier() {
             </label>
             <select
               value={form.type}
-              onChange={(e) => update('type', e.target.value)}
+              onChange={(e) => updateType(e.target.value)}
               className="w-full border border-slate-200 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-700"
             >
               {Object.values(TypeAudience).map((t) => (
@@ -128,6 +150,11 @@ export default function NouveauDossier() {
                 </option>
               ))}
             </select>
+            {!avecDefendeur && (
+              <p className="text-xs text-slate-400 mt-1.5">
+                Procédure introduite par requête : un seul requérant, pas de défendeur.
+              </p>
+            )}
           </div>
 
           <div>
@@ -147,12 +174,12 @@ export default function NouveauDossier() {
 
           <div className="border-t border-slate-100 pt-4">
             <p className="text-xs font-medium uppercase tracking-wide text-slate-400 mb-2">
-              Demandeur
+              {libellePartie}
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-600 mb-1.5">
-                  Nom du demandeur
+                  Nom du {libellePartie.toLowerCase()}
                 </label>
                 <input
                   value={form.demandeur}
@@ -171,7 +198,7 @@ export default function NouveauDossier() {
                   className="w-full border border-slate-200 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-700"
                 >
                   <option value="">— Aucun compte lié —</option>
-                  {justiciables.map((j) => (
+                  {justiciablesDemandeur.map((j) => (
                     <option key={j.id_utilisateur} value={j.id_utilisateur}>
                       {j.nom} ({j.email})
                     </option>
@@ -181,7 +208,7 @@ export default function NouveauDossier() {
             </div>
             <div className="mt-4">
               <label className="block text-sm font-medium text-slate-600 mb-1.5">
-                Avocat du demandeur (optionnel)
+                Avocat du {libellePartie.toLowerCase()} (optionnel)
               </label>
               <select
                 value={form.id_demandeur_avocat}
@@ -189,7 +216,7 @@ export default function NouveauDossier() {
                 className="w-full border border-slate-200 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-700"
               >
                 <option value="">— Aucun avocat —</option>
-                {avocats.map((a) => (
+                {avocatsDemandeur.map((a) => (
                   <option key={a.id_utilisateur} value={a.id_utilisateur}>
                     {a.nom} ({a.email})
                   </option>
@@ -198,6 +225,7 @@ export default function NouveauDossier() {
             </div>
           </div>
 
+          {avecDefendeur && (
           <div className="border-t border-slate-100 pt-4">
             <p className="text-xs font-medium uppercase tracking-wide text-slate-400 mb-2">
               Défendeur
@@ -224,7 +252,7 @@ export default function NouveauDossier() {
                   className="w-full border border-slate-200 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-700"
                 >
                   <option value="">— Aucun compte lié —</option>
-                  {justiciables.map((j) => (
+                  {justiciablesDefendeur.map((j) => (
                     <option key={j.id_utilisateur} value={j.id_utilisateur}>
                       {j.nom} ({j.email})
                     </option>
@@ -242,7 +270,7 @@ export default function NouveauDossier() {
                 className="w-full border border-slate-200 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-700"
               >
                 <option value="">— Aucun avocat —</option>
-                {avocats.map((a) => (
+                {avocatsDefendeur.map((a) => (
                   <option key={a.id_utilisateur} value={a.id_utilisateur}>
                     {a.nom} ({a.email})
                   </option>
@@ -250,14 +278,16 @@ export default function NouveauDossier() {
               </select>
             </div>
           </div>
+          )}
 
+          {avecProcureur && (
           <div className="border-t border-slate-100 pt-4">
             <label className="block text-sm font-medium text-slate-600 mb-1.5">
               Procureur assigné (optionnel)
             </label>
             <p className="text-xs text-slate-400 mb-2">
-              Procureur par défaut pour l'avis sur ce dossier. N'importe quel procureur pourra
-              tout de même consulter le dossier et donner un avis si besoin.
+              Dossier communiqué au ministère public : procureur par défaut pour l'avis.
+              Tout procureur pourra aussi consulter le dossier et donner un avis.
             </p>
             <select
               value={form.id_procureur}
@@ -272,6 +302,7 @@ export default function NouveauDossier() {
               ))}
             </select>
           </div>
+          )}
 
           <button
             type="submit"

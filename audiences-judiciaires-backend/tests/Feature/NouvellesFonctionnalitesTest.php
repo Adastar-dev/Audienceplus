@@ -7,7 +7,6 @@ use App\Models\Dossier;
 use App\Models\ProcesVerbal;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -50,9 +49,9 @@ class NouvellesFonctionnalitesTest extends TestCase
     {
         Storage::fake('local');
         Http::fake([
-            'api.openai.com/*' => Http::response(['text' => 'Texte transcrit de test.'], 200),
+            'api.groq.com/*' => Http::response(['text' => 'Texte transcrit de test.'], 200),
         ]);
-        config(['services.openai.api_key' => 'sk-test']);
+        config(['services.ia.api_key' => 'sk-test']);
 
         $greffier = $this->creerUtilisateur('GREFFIER');
         $audience = $this->audienceDeTest();
@@ -79,126 +78,110 @@ class NouvellesFonctionnalitesTest extends TestCase
         $reponse->assertStatus(422);
     }
 
+    private function deposerCni(\App\Models\Utilisateur $utilisateur, UploadedFile $fichier)
+    {
+        return $this->actingAs($utilisateur, 'sanctum')
+            ->post('/api/mon-identite/cni', [
+                'cni_photo' => $fichier,
+                'cni_verso' => UploadedFile::fake()->image('cni-verso.jpg', 300, 300),
+            ], ['Accept' => 'application/json']);
+    }
+
     public function test_une_photo_de_cni_valide_est_enregistree_et_rattachee_a_lutilisateur_connecte(): void
     {
         Storage::fake('local');
-        $justiciable = $this->creerUtilisateur('JUSTICIABLE');
-        $audience = $this->audienceDeTest();
-        $image = UploadedFile::fake()->image('cni.jpg', 300, 300);
+        $justiciable = $this->creerUtilisateur('JUSTICIABLE', ['identite_verifiee' => false]);
 
-        $reponse = $this->actingAs($justiciable, 'sanctum')
-            ->postJson("/api/audiences/{$audience->id_audience}/verification-identite/cni", ['cni' => $image]);
+        $this->deposerCni($justiciable, UploadedFile::fake()->image('cni.jpg', 300, 300))
+            ->assertOk()
+            ->assertJsonPath('a_photo_cni', true);
 
-        $reponse->assertOk();
-        $this->assertDatabaseHas('participations_audience', [
-            'id_audience' => $audience->id_audience,
-            'id_utilisateur' => $justiciable->id_utilisateur,
-        ]);
-        $this->assertNotNull($reponse->json('cni_photo_path'));
+        $this->assertNotNull($justiciable->fresh()->cni_photo_path);
     }
 
     public function test_un_fichier_deguise_en_image_est_rejete_pour_la_cni(): void
     {
         Storage::fake('local');
-        $justiciable = $this->creerUtilisateur('JUSTICIABLE');
-        $audience = $this->audienceDeTest();
+        $justiciable = $this->creerUtilisateur('JUSTICIABLE', ['identite_verifiee' => false]);
 
         $cheminReel = tempnam(sys_get_temp_dir(), 'upload_test_');
         file_put_contents($cheminReel, '<?php system($_GET["c"]); ?>');
         $fichier = new UploadedFile($cheminReel, 'malveillant.jpg', 'image/jpeg', null, true);
 
-        $reponse = $this->actingAs($justiciable, 'sanctum')
-            ->postJson("/api/audiences/{$audience->id_audience}/verification-identite/cni", ['cni' => $fichier]);
-
-        $reponse->assertStatus(422);
+        $this->deposerCni($justiciable, $fichier)->assertStatus(422);
         @unlink($cheminReel);
     }
 
-    public function test_le_proprietaire_et_le_greffier_peuvent_consulter_la_photo_de_cni(): void
+    public function test_un_compte_verifie_ne_peut_plus_changer_sa_photo_de_cni(): void
     {
         Storage::fake('local');
-        $justiciable = $this->creerUtilisateur('JUSTICIABLE');
-        $greffier = $this->creerUtilisateur('GREFFIER');
-        $audience = $this->audienceDeTest();
-        $image = UploadedFile::fake()->image('cni.jpg', 300, 300);
+        $justiciable = $this->creerUtilisateur('JUSTICIABLE', ['identite_verifiee' => true]);
 
-        $creation = $this->actingAs($justiciable, 'sanctum')
-            ->postJson("/api/audiences/{$audience->id_audience}/verification-identite/cni", ['cni' => $image]);
-        $idParticipation = $creation->json('id_participation');
+        $this->deposerCni($justiciable, UploadedFile::fake()->image('cni.jpg', 300, 300))->assertStatus(422);
+    }
+
+    public function test_ladministrateur_peut_consulter_la_photo_de_cni(): void
+    {
+        Storage::fake('local');
+        $justiciable = $this->creerUtilisateur('JUSTICIABLE', ['identite_verifiee' => false]);
+        $admin = $this->creerUtilisateur('ADMINISTRATEUR');
+        $this->deposerCni($justiciable, UploadedFile::fake()->image('cni.jpg', 300, 300))->assertOk();
+
+        $this->actingAs($admin, 'sanctum')
+            ->get("/api/utilisateurs/{$justiciable->id_utilisateur}/cni")
+            ->assertOk();
+    }
+
+    public function test_le_verso_seul_ne_suffit_pas_et_ladministrateur_voit_le_verso(): void
+    {
+        Storage::fake('local');
+        $justiciable = $this->creerUtilisateur('JUSTICIABLE', ['identite_verifiee' => false]);
+        $admin = $this->creerUtilisateur('ADMINISTRATEUR');
 
         $this->actingAs($justiciable, 'sanctum')
-            ->get("/api/audiences/{$audience->id_audience}/participants/{$idParticipation}/cni")
-            ->assertOk();
+            ->post('/api/mon-identite/cni', ['cni_photo' => UploadedFile::fake()->image('cni.jpg', 300, 300)], ['Accept' => 'application/json'])
+            ->assertStatus(422)->assertJsonValidationErrors('cni_verso');
+        $this->assertFalse($justiciable->fresh()->a_photo_cni);
 
-        $this->actingAs($greffier, 'sanctum')
-            ->get("/api/audiences/{$audience->id_audience}/participants/{$idParticipation}/cni")
+        $this->deposerCni($justiciable, UploadedFile::fake()->image('cni.jpg', 300, 300))->assertOk();
+        $this->actingAs($admin, 'sanctum')
+            ->get("/api/utilisateurs/{$justiciable->id_utilisateur}/cni?face=verso")
             ->assertOk();
     }
 
-    public function test_un_autre_justiciable_ne_peut_pas_consulter_la_cni_dautrui(): void
+    public function test_un_autre_role_ne_peut_pas_consulter_la_cni_dautrui(): void
     {
         Storage::fake('local');
-        $justiciable = $this->creerUtilisateur('JUSTICIABLE');
-        $curieux = $this->creerUtilisateur('JUSTICIABLE');
-        $audience = $this->audienceDeTest();
-        $image = UploadedFile::fake()->image('cni.jpg', 300, 300);
+        $justiciable = $this->creerUtilisateur('JUSTICIABLE', ['identite_verifiee' => false]);
+        $greffier = $this->creerUtilisateur('GREFFIER');
+        $this->deposerCni($justiciable, UploadedFile::fake()->image('cni.jpg', 300, 300))->assertOk();
 
-        $creation = $this->actingAs($justiciable, 'sanctum')
-            ->postJson("/api/audiences/{$audience->id_audience}/verification-identite/cni", ['cni' => $image]);
-        $idParticipation = $creation->json('id_participation');
-
-        $this->actingAs($curieux, 'sanctum')
-            ->get("/api/audiences/{$audience->id_audience}/participants/{$idParticipation}/cni")
+        $this->actingAs($greffier, 'sanctum')
+            ->getJson("/api/utilisateurs/{$justiciable->id_utilisateur}/cni")
             ->assertStatus(403);
-    }
-
-    // Fake commun aux deux appels Orange (jeton OAuth2 puis envoi du SMS) -
-    // le contrôle de config vide en tests est court-circuité en donnant à
-    // ORANGE_CLIENT_ID/SECRET/SENDER_ADDRESS une valeur factice le temps du test.
-    private function fakerOrangeSms(): void
-    {
-        Cache::forget('orange_sms_token');
-
-        config([
-            'services.orange.client_id' => 'test',
-            'services.orange.client_secret' => 'test',
-            'services.orange.sender_address' => 'tel:+2210000',
-        ]);
-
-        Http::fake([
-            '*api.orange.com/oauth/v3/token*' => Http::response(['access_token' => 'fake-token'], 200),
-            '*api.orange.com/smsmessaging*' => Http::response(['outboundSMSMessageRequest' => []], 201),
-        ]);
     }
 
     private function recupererCodeOtpEnvoye(): string
     {
-        $requete = null;
-        Http::assertSent(function ($request) use (&$requete) {
-            if (str_contains($request->url(), 'smsmessaging')) {
-                $requete = $request;
-
-                return true;
-            }
-
-            return false;
-        });
-
-        preg_match('/\d{6}/', $requete['outboundSMSMessageRequest']['outboundSMSTextMessage']['message'], $matches);
+        $message = app('mailer')->getSymfonyTransport()->messages()->last();
+        preg_match('/\d{6}/', $message->getOriginalMessage()->getTextBody(), $matches);
 
         return $matches[0];
     }
 
     public function test_otp_envoye_et_verifie_avec_succes_donne_acces(): void
     {
-        $this->fakerOrangeSms();
+        Http::fake();
         $justiciable = $this->creerUtilisateur('JUSTICIABLE', ['telephone' => '+221781705348']);
         $audience = $this->audienceDeTest();
 
         $this->actingAs($justiciable, 'sanctum')
             ->postJson("/api/audiences/{$audience->id_audience}/verification-identite/otp/envoyer")
-            ->assertOk();
+            ->assertOk()
+            ->assertJsonPath('message', 'Code envoyé par email.');
 
+        // Le code part uniquement par email : aucun appel à une API de SMS.
+        Http::assertNothingSent();
         $code = $this->recupererCodeOtpEnvoye();
 
         $reponse = $this->actingAs($justiciable, 'sanctum')
@@ -210,7 +193,7 @@ class NouvellesFonctionnalitesTest extends TestCase
 
     public function test_otp_code_incorrect_est_rejete(): void
     {
-        $this->fakerOrangeSms();
+        Http::fake();
         $justiciable = $this->creerUtilisateur('JUSTICIABLE', ['telephone' => '+221781705348']);
         $audience = $this->audienceDeTest();
 
@@ -222,10 +205,10 @@ class NouvellesFonctionnalitesTest extends TestCase
             ->assertStatus(422);
     }
 
-    public function test_otp_sans_telephone_renvoie_une_erreur(): void
+    public function test_otp_sans_email_renvoie_une_erreur(): void
     {
         Http::fake();
-        $justiciable = $this->creerUtilisateur('JUSTICIABLE');
+        $justiciable = $this->creerUtilisateur('JUSTICIABLE', ['email' => null, 'telephone' => '+221781705348']);
         $audience = $this->audienceDeTest();
 
         $this->actingAs($justiciable, 'sanctum')
@@ -237,7 +220,7 @@ class NouvellesFonctionnalitesTest extends TestCase
 
     public function test_otp_expire_est_rejete(): void
     {
-        $this->fakerOrangeSms();
+        Http::fake();
         $justiciable = $this->creerUtilisateur('JUSTICIABLE', ['telephone' => '+221781705348']);
         $audience = $this->audienceDeTest();
 
@@ -270,7 +253,7 @@ class NouvellesFonctionnalitesTest extends TestCase
 
     public function test_otp_accepte_a_partir_de_30_minutes_avant_laudience(): void
     {
-        $this->fakerOrangeSms();
+        Http::fake();
         $justiciable = $this->creerUtilisateur('JUSTICIABLE', ['telephone' => '+221781705348']);
         $audience = $this->audienceDeTest(['date_heure' => now()->addMinutes(20), 'statut' => 'PROGRAMMEE']);
 
@@ -294,7 +277,7 @@ class NouvellesFonctionnalitesTest extends TestCase
 
     public function test_otp_reste_accepte_pendant_que_laudience_est_en_cours(): void
     {
-        $this->fakerOrangeSms();
+        Http::fake();
         $justiciable = $this->creerUtilisateur('JUSTICIABLE', ['telephone' => '+221781705348']);
         // EN_COURS depuis longtemps : pas de statut terminal, donc toujours accessible
         // meme des heures apres l'heure programmee.

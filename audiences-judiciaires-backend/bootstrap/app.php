@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->api(append: [
             \App\Http\Middleware\MarquerAudiencesRatees::class,
+            \App\Http\Middleware\JournaliserActivite::class,
         ]);
 
         $middleware->redirectGuestsTo(fn () => null);

@@ -28,6 +28,7 @@ export const NAV_BY_ROLE = {
     { label: 'Convocations', to: '/avocat/convocations' },
     { label: 'Historique des audiences', to: '/avocat/historique' },
     { label: 'Messagerie', to: '/avocat/messagerie' },
+    { label: 'Notifications', to: '/avocat/notifications' },
   ],
   [Role.JUSTICIABLE]: [
     { label: 'Tableau de bord', to: '/justiciable' },
@@ -42,6 +43,7 @@ export const NAV_BY_ROLE = {
     { label: 'Tableau de bord', to: '/admin' },
     { label: 'Utilisateurs & rôles', to: '/admin/utilisateurs' },
     { label: 'Tribunaux & salles', to: '/admin/tribunaux' },
+    { label: 'Statistiques', to: '/admin/statistiques' },
     { label: 'Paramètres de sécurité', to: '/admin/securite' },
     { label: 'Logs & traçabilité', to: '/admin/logs' },
   ],

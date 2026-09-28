@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, Gavel, FileText, Loader2, Scale } from 'lucide-react'
+import { ArrowLeft, Archive, Gavel, FileText, Loader2, Scale } from 'lucide-react'
 import { getAudienceById, ouvrirAudience, cloturerAudience } from '../../services/api/audiences'
 import { getPV } from '../../services/api/procesVerbaux'
-import { StatutAudience, StatutPV } from '../../constants/enums'
+import { archiverDossier } from '../../services/api/dossiers'
+import { StatutAudience, StatutDossier, StatutPV } from '../../constants/enums'
 import AudienceStatusBadge from '../../components/ui/AudienceStatusBadge'
+import DossierStatusBadge from '../../components/ui/DossierStatusBadge'
 import PVStatusBadge from '../../components/ui/PVStatusBadge'
 
 export default function AudienceDetail() {
@@ -39,11 +41,27 @@ export default function AudienceDetail() {
   async function enregistrerDecision(type) {
     try {
       const updated = await cloturerAudience(id, type)
-      setAudience((a) => ({ ...a, statut: updated.statut }))
+      setAudience((a) => ({
+        ...a,
+        statut: updated.statut,
+        // Un jugement fait passer le dossier au statut « jugé ».
+        dossier: type === 'jugement' ? { ...a.dossier, statut: StatutDossier.JUGE } : a.dossier,
+      }))
       setDecision(type)
       setShowDecision(false)
     } catch {
       setErreur("Impossible d'enregistrer la décision.")
+    }
+  }
+
+  async function handleArchiver() {
+    if (!window.confirm('Archiver ce dossier ? Il ne pourra plus être modifié.')) return
+    setErreur('')
+    try {
+      const dossier = await archiverDossier(audience.id_dossier)
+      setAudience((a) => ({ ...a, dossier: { ...a.dossier, statut: dossier.statut } }))
+    } catch (err) {
+      setErreur(err.response?.data?.message || "Impossible d'archiver le dossier.")
     }
   }
 
@@ -157,6 +175,30 @@ export default function AudienceDetail() {
           </button>
         )}
       </div>
+
+      {[StatutDossier.JUGE, StatutDossier.CLOTURE, StatutDossier.ARCHIVE].includes(audience.dossier?.statut) && (
+        <div className="bg-white border border-slate-200 rounded-md p-5 mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-medium text-navy-900 mb-1 flex items-center gap-2">
+              Dossier <DossierStatusBadge statut={audience.dossier.statut} />
+            </h2>
+            <p className="text-sm text-slate-400">
+              {audience.dossier.statut === StatutDossier.ARCHIVE
+                ? 'Dossier archivé : il ne peut plus être modifié.'
+                : "Sans action de votre part, il sera archivé 15 jours après l'accusé de réception de la décision par toutes les parties, s'il n'y a pas de contestation."}
+            </p>
+          </div>
+          {audience.dossier.statut !== StatutDossier.ARCHIVE && (
+            <button
+              onClick={handleArchiver}
+              className="flex items-center gap-2 border border-slate-200 text-slate-600 text-sm font-medium rounded px-4 py-2 hover:bg-slate-50 transition-colors"
+            >
+              <Archive size={15} />
+              Archiver le dossier
+            </button>
+          )}
+        </div>
+      )}
 
       {audience.dossier?.avis_procureur && (
         <div className="bg-white border border-slate-200 rounded-md p-5 mb-6">

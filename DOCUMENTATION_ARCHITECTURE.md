@@ -8,10 +8,10 @@ Le backend centralise l'ensemble de la logique métier et orchestre les échange
 - la base de données **MySQL** (persistance : dossiers, audiences, utilisateurs) ;
 - le système de stockage de fichiers (pièces jointes aux dossiers) ;
 - **Jitsi Meet** pour les audiences à distance en visioconférence sécurisée ;
-- le module de notifications : SMS via l'**API SMS Sénégal d'Orange** et emails via **SMTP** ;
-- l'**API d'OpenAI** (Whisper), pour la transcription automatique des procès-verbaux et la reconnaissance optique de caractères (OCR) sur les pièces d'identité.
+- le module de notifications : emails via **SMTP**, doublés d'une notification sur la plateforme ;
+- l'**API Groq** (format compatible OpenAI), pour la transcription automatique des procès-verbaux (Whisper large v3) et la lecture du numéro des pièces d'identité (modèle de vision Qwen). Le fournisseur est réglable dans le `.env` (`IA_BASE_URL`, `IA_API_KEY`, modèles).
 
-La vérification de l'identité du participant repose sur un code de vérification à 6 chiffres envoyé par SMS (OTP), via l'API SMS Sénégal d'Orange. L'indicateur OCR n'est volontairement pas un verrou d'accès : il produit un indicateur de confiance consulté par le greffier ou le juge, sans jamais bloquer automatiquement une connexion.
+La vérification de l'identité du participant repose sur un code de vérification à 6 chiffres (OTP) envoyé par email, valable 5 minutes ; le participant est ensuite admis dans la salle par le greffier ou le juge. L'indicateur OCR n'est volontairement pas un verrou d'accès : il produit un indicateur de confiance consulté par le greffier ou le juge, sans jamais bloquer automatiquement une connexion.
 
 ### Parcours en couches (1 à 5)
 
@@ -45,9 +45,9 @@ La vérification de l'identité du participant repose sur un code de vérificati
 - Contrôle d'accès aux pièces d'un dossier conditionné à la vérification d'identité, même pour un compte légitimement rattaché.
 - Chiffrement des communications en HTTPS.
 
-### e. Couche communication (Jitsi Meet, API SMS Sénégal d'Orange)
+### e. Couche communication (Jitsi Meet, SMTP)
 - Jitsi Meet : audiences à distance en visioconférence sécurisée (audio, vidéo, WebRTC).
-- API SMS Sénégal d'Orange : envoi de SMS (convocations, rappels), complété par l'envoi d'emails via SMTP.
+- SMTP : envoi des emails (convocations, rappels automatiques, décisions, code OTP), doublés d'une notification sur la plateforme.
 
 ## Connexion à une audience à distance (Jitsi Meet)
 
@@ -77,10 +77,10 @@ Authentification par jeton (Sanctum) et contrôle des rôles, complétés par : 
 
 - Développement : XAMPP (Apache, MySQL, PHP) pour le backend, serveur de développement Vite pour le frontend (rechargement à chaud).
 - Tests automatisés : exécutés sur une base de données SQLite en mémoire, isolée de la base MySQL de développement, pour des exécutions rapides et reproductibles.
-- Qualité du code : suite de tests automatisés (Pest/PHPUnit, 122 tests) couvrant l'authentification et le contrôle des rôles, le cycle de vie d'un dossier et d'une audience, la gestion des demandes de comparution à distance, le dépôt/téléchargement des pièces, et l'enregistrement de l'avis du procureur — exécutée à chaque évolution significative du code.
+- Qualité du code : suite de tests automatisés (Pest/PHPUnit, 170 tests) couvrant l'authentification et le contrôle des rôles, le cycle de vie d'un dossier et d'une audience, la gestion des demandes de comparution à distance, le dépôt/téléchargement des pièces, et l'enregistrement de l'avis du procureur — exécutée à chaque évolution significative du code.
 
 ## Architecture de production cible
 
-Serveur Nginx exposant l'API Laravel via PHP-FPM, base de données MySQL dédiée, espace de stockage pour les pièces jointes, connexions sortantes vers les services externes (Jitsi Meet, API SMS Sénégal d'Orange, OpenAI) exposées derrière HTTPS. Les secrets d'accès (clés API) sont externalisés dans des variables d'environnement non versionnées, pour limiter les risques de fuite d'information sensible.
+Serveur Nginx exposant l'API Laravel via PHP-FPM, base de données MySQL dédiée, espace de stockage pour les pièces jointes, connexions sortantes vers les services externes (Jitsi Meet, serveur SMTP, Groq) exposées derrière HTTPS. Les secrets d'accès (clés API) sont externalisés dans des variables d'environnement non versionnées, pour limiter les risques de fuite d'information sensible.
 
 Le backend Laravel et le frontend React sont conteneurisés avec Docker et Docker Compose, ce qui garantit un environnement homogène entre développement, tests et production, et facilite le déploiement d'une juridiction à l'autre.

@@ -6,17 +6,61 @@ use Illuminate\Database\Eloquent\Model;
 
 class Dossier extends Model
 {
+    // Procédures gracieuses : introduites par requête, sans adversaire. Le
+    // dossier n'a qu'une partie, le requérant (enregistré comme demandeur).
+    public const TYPES_SANS_DEFENDEUR = [
+        'CHANGEMENT_NOM',
+        'RECTIFICATION_ACTE',
+        'ADOPTION',
+        'TUTELLE',
+        'DECLARATION_ABSENCE_DECES',
+        'EMANCIPATION',
+    ];
+
+    // Dossiers communiqués au ministère public : seuls ceux-ci sont visibles
+    // par le procureur, qui peut y donner son avis.
+    public const TYPES_AVEC_MINISTERE_PUBLIC = [
+        'ADOPTION',
+        'FILIATION',
+        'TUTELLE',
+    ];
+
+    public static function communiqueAuParquet(string $type): bool
+    {
+        return in_array($type, self::TYPES_AVEC_MINISTERE_PUBLIC, true);
+    }
+
+    public static function aUnDefendeur(string $type): bool
+    {
+        return ! in_array($type, self::TYPES_SANS_DEFENDEUR, true);
+    }
 
     protected $primaryKey = 'id_dossier';
 
     protected $fillable = [
-        'numero', 'type', 'statut', 'parties', 'id_tribunal', 'id_tribunal', 'id_justiciable', 'id_avocat', 'id_procureur', 'date_creation',
-        'avis_procureur', 'avis_procureur_par', 'avis_procureur_date',
+        'numero', 'type', 'statut', 'parties', 'id_tribunal', 'id_justiciable', 'id_avocat', 'id_procureur', 'date_creation',
+        'avis_procureur', 'avis_procureur_par', 'avis_procureur_date', 'date_archivage',
     ];
 
     protected $casts = [
         'date_creation' => 'datetime',
+        'date_archivage' => 'datetime',
     ];
+
+    // Juge, greffier et procureur ne voient que les dossiers de leur tribunal
+    // (besoin d'en connaître) ; un juge voit aussi ceux dont il préside une
+    // audience. Un compte sans tribunal de rattachement n'est pas filtré.
+    public const ROLES_JURIDICTION = ['JUGE', 'GREFFIER', 'PROCUREUR'];
+
+    public function estArchive(): bool
+    {
+        return $this->statut === 'ARCHIVE';
+    }
+
+    public function archiver(): void
+    {
+        $this->update(['statut' => 'ARCHIVE', 'date_archivage' => now()]);
+    }
 
     public function tribunal()
     {
@@ -73,6 +117,16 @@ class Dossier extends Model
     // relierait alors le dossier au compte frauduleux sans le savoir.
     public function estAccessiblePar(Utilisateur $utilisateur): bool
     {
+        if (in_array($utilisateur->role, self::ROLES_JURIDICTION, true)) {
+            if ($utilisateur->role === 'PROCUREUR' && ! self::communiqueAuParquet($this->type)) {
+                return false;
+            }
+
+            return ! $utilisateur->id_tribunal
+                || (int) $this->id_tribunal === (int) $utilisateur->id_tribunal
+                || $this->audiences()->where('id_juge', $utilisateur->id_utilisateur)->exists();
+        }
+
         if (! in_array($utilisateur->role, ['JUSTICIABLE', 'AVOCAT'], true)) {
             return true;
         }
@@ -86,6 +140,20 @@ class Dossier extends Model
 
     public function scopeVisiblesPar($query, Utilisateur $utilisateur)
     {
+        if (in_array($utilisateur->role, self::ROLES_JURIDICTION, true)) {
+            if ($utilisateur->role === 'PROCUREUR') {
+                $query->whereIn('type', self::TYPES_AVEC_MINISTERE_PUBLIC);
+            }
+
+            if ($utilisateur->id_tribunal) {
+                $query->where(fn ($q) => $q
+                    ->where('id_tribunal', $utilisateur->id_tribunal)
+                    ->orWhereHas('audiences', fn ($a) => $a->where('id_juge', $utilisateur->id_utilisateur)));
+            }
+
+            return $query;
+        }
+
         if (! in_array($utilisateur->role, ['JUSTICIABLE', 'AVOCAT'], true)) {
             return $query;
         }

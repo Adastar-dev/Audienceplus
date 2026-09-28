@@ -95,16 +95,46 @@ class AccesDossierTest extends TestCase
             ->assertOk();
     }
 
-    public function test_les_roles_institutionnels_voient_tous_les_dossiers(): void
+    public function test_le_greffier_et_le_juge_voient_tous_les_dossiers(): void
     {
         $greffier = $this->creerUtilisateur('GREFFIER');
         $juge = $this->creerUtilisateur('JUGE');
-        $procureur = $this->creerUtilisateur('PROCUREUR');
         $dossier = $this->dossierDeTest();
 
         $this->actingAs($greffier, 'sanctum')->getJson("/api/dossiers/{$dossier->id_dossier}")->assertOk();
         $this->actingAs($juge, 'sanctum')->getJson("/api/dossiers/{$dossier->id_dossier}")->assertOk();
-        $this->actingAs($procureur, 'sanctum')->getJson("/api/dossiers/{$dossier->id_dossier}")->assertOk();
+    }
+
+    public function test_le_procureur_ne_voit_que_les_dossiers_communiques_au_parquet(): void
+    {
+        $procureur = $this->creerUtilisateur('PROCUREUR');
+        $adoption = $this->dossierDeTest();
+        $adoption->update(['type' => 'ADOPTION']);
+        $divorce = $this->dossierDeTest();
+        $divorce->update(['type' => 'DIVORCE']);
+
+        $this->actingAs($procureur, 'sanctum')->getJson("/api/dossiers/{$adoption->id_dossier}")->assertOk();
+        $this->actingAs($procureur, 'sanctum')->getJson("/api/dossiers/{$divorce->id_dossier}")->assertStatus(403);
+
+        $ids = collect($this->actingAs($procureur, 'sanctum')->getJson('/api/dossiers')->json())->pluck('id_dossier');
+        $this->assertTrue($ids->contains($adoption->id_dossier));
+        $this->assertFalse($ids->contains($divorce->id_dossier));
+
+        $this->actingAs($procureur, 'sanctum')
+            ->patchJson("/api/dossiers/{$divorce->id_dossier}/avis", ['avis' => 'Avis.'])
+            ->assertStatus(403);
+    }
+
+    public function test_un_justiciable_ne_voit_pas_les_audiences_des_autres_dossiers(): void
+    {
+        $justiciable = $this->creerUtilisateur('JUSTICIABLE');
+        $dossier = $this->dossierDeTest();
+        $audience = \App\Models\Audience::create([
+            'id_dossier' => $dossier->id_dossier, 'date_heure' => now()->addDay(), 'mode' => 'PRESENTIEL', 'statut' => 'PROGRAMMEE',
+        ]);
+
+        $this->actingAs($justiciable, 'sanctum')->getJson("/api/audiences/{$audience->id_audience}")->assertStatus(403);
+        $this->assertEmpty($this->actingAs($justiciable, 'sanctum')->getJson('/api/audiences')->json());
     }
 
     public function test_un_avocat_non_verifie_ne_peut_pas_consulter_les_pieces_du_dossier(): void
@@ -124,7 +154,7 @@ class AccesDossierTest extends TestCase
     public function test_un_administrateur_peut_lister_et_verifier_un_avocat(): void
     {
         $admin = $this->creerUtilisateur('ADMINISTRATEUR');
-        $avocat = $this->creerUtilisateur('AVOCAT', ['identite_verifiee' => false]);
+        $avocat = $this->creerUtilisateur('AVOCAT', ['identite_verifiee' => false, 'cni_photo_path' => 'cni-comptes/test.jpg', 'cni_verso_path' => 'cni-comptes/test-verso.jpg']);
 
         $reponseListe = $this->actingAs($admin, 'sanctum')->getJson('/api/comptes-a-verifier');
         $reponseListe->assertOk();
@@ -139,7 +169,7 @@ class AccesDossierTest extends TestCase
     public function test_un_administrateur_peut_lister_et_verifier_un_justiciable(): void
     {
         $admin = $this->creerUtilisateur('ADMINISTRATEUR');
-        $justiciable = $this->creerUtilisateur('JUSTICIABLE', ['identite_verifiee' => false]);
+        $justiciable = $this->creerUtilisateur('JUSTICIABLE', ['identite_verifiee' => false, 'cni_photo_path' => 'cni-comptes/test.jpg', 'cni_verso_path' => 'cni-comptes/test-verso.jpg']);
 
         $reponseListe = $this->actingAs($admin, 'sanctum')->getJson('/api/comptes-a-verifier');
         $reponseListe->assertOk();
@@ -169,5 +199,17 @@ class AccesDossierTest extends TestCase
         $this->actingAs($admin, 'sanctum')
             ->postJson("/api/utilisateurs/{$juge->id_utilisateur}/verifier-identite")
             ->assertStatus(422);
+    }
+
+    public function test_un_compte_sans_photo_de_cni_ne_peut_pas_etre_verifie(): void
+    {
+        $admin = $this->creerUtilisateur('ADMINISTRATEUR');
+        $justiciable = $this->creerUtilisateur('JUSTICIABLE', ['identite_verifiee' => false]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson("/api/utilisateurs/{$justiciable->id_utilisateur}/verifier-identite")
+            ->assertStatus(422);
+
+        $this->assertFalse($justiciable->fresh()->identite_verifiee);
     }
 }

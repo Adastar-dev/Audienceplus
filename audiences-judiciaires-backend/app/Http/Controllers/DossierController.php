@@ -9,6 +9,8 @@ use App\Services\NotificationDispatcher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+use App\Support\Messages;
 
 class DossierController extends Controller
 {
@@ -50,7 +52,7 @@ class DossierController extends Controller
             'type' => 'required|in:DIVORCE,ADOPTION,RECTIFICATION_ACTE,CONTENTIEUX_MARIAGE,FILIATION,GARDE_PENSION,TUTELLE,DECLARATION_ABSENCE_DECES,CHANGEMENT_NOM,EMANCIPATION',
             'id_tribunal' => 'required|exists:tribunaux,id_tribunal',
             'demandeur' => 'required|string|max:255',
-            'defendeur' => 'required|string|max:255',
+            'defendeur' => [Rule::requiredIf(Dossier::aUnDefendeur((string) $request->type)), 'nullable', 'string', 'max:255'],
             'id_demandeur_utilisateur' => 'nullable|exists:utilisateurs,id_utilisateur',
             'id_demandeur_avocat' => 'nullable|exists:utilisateurs,id_utilisateur',
             'id_defendeur_utilisateur' => 'nullable|exists:utilisateurs,id_utilisateur',
@@ -60,6 +62,19 @@ class DossierController extends Controller
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $avecDefendeur = Dossier::aUnDefendeur($request->type);
+
+        if ($request->filled('id_procureur') && ! Dossier::communiqueAuParquet($request->type)) {
+            return response()->json(['errors' => ['id_procureur' => ["Ce type de dossier n'est pas communiqué au ministère public : aucun procureur ne peut y être assigné."]]], 422);
+        }
+
+        // Procédure gracieuse (changement de nom, adoption...) : pas de défendeur.
+        if (! $avecDefendeur && ($request->filled('defendeur') || $request->filled('id_defendeur_utilisateur') || $request->filled('id_defendeur_avocat'))) {
+            return response()->json(['errors' => ['defendeur' => [
+                "Ce type de procédure est introduit par requête et ne comporte pas de défendeur.",
+            ]]], 422);
         }
 
         // Une même personne ne peut figurer qu'une fois dans un dossier (contrainte
@@ -78,7 +93,7 @@ class DossierController extends Controller
 
         // Transaction : si la liaison d'une partie échoue, le dossier n'est pas
         // créé à moitié.
-        $dossier = DB::transaction(function () use ($request) {
+        $dossier = DB::transaction(function () use ($request, $avecDefendeur) {
             $annee = now()->year;
             $sequence = Dossier::whereYear('date_creation', $annee)->count() + 1;
             $numero = sprintf('TRB-DKR-%d-%04d', $annee, $sequence);
@@ -94,14 +109,16 @@ class DossierController extends Controller
                 'numero' => $numero,
                 'type' => $request->type,
                 'statut' => 'EN_COURS',
-                'parties' => "{$request->demandeur} c. {$request->defendeur}",
+                'parties' => $avecDefendeur ? "{$request->demandeur} c. {$request->defendeur}" : "Requête de {$request->demandeur}",
                 'id_tribunal' => $request->id_tribunal,
                 'id_procureur' => $request->id_procureur,
                 'date_creation' => now(),
             ]);
 
             $this->lierPartie($dossier, 'DEMANDEUR', $request->id_demandeur_utilisateur, $request->id_demandeur_avocat);
-            $this->lierPartie($dossier, 'DEFENDEUR', $request->id_defendeur_utilisateur, $request->id_defendeur_avocat);
+            if ($avecDefendeur) {
+                $this->lierPartie($dossier, 'DEFENDEUR', $request->id_defendeur_utilisateur, $request->id_defendeur_avocat);
+            }
 
             return $dossier;
         });
@@ -121,11 +138,7 @@ class DossierController extends Controller
             return;
         }
 
-        $this->notifications->envoyerLibre(
-            $procureur,
-            'Dossier assigné',
-            "Le dossier {$dossier->numero} ({$dossier->parties}) vous a été assigné pour avis.",
-        );
+        $this->notifications->envoyerMessage($procureur, Messages::dossierAssigne($dossier));
     }
 
     private function lierPartie(Dossier $dossier, string $rolePartie, ?int $idJusticiable, ?int $idAvocat): void
@@ -152,6 +165,10 @@ class DossierController extends Controller
 
     public function update(Request $request, Dossier $dossier)
     {
+        if ($dossier->estArchive()) {
+            return response()->json(['message' => 'Ce dossier est archivé : il ne peut plus être modifié.'], 409);
+        }
+
         $validator = Validator::make($request->all(), [
             'statut' => 'sometimes|in:EN_COURS,RENVOYE,JUGE,CLOTURE',
             'id_procureur' => 'sometimes|nullable|exists:utilisateurs,id_utilisateur',
@@ -159,6 +176,10 @@ class DossierController extends Controller
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        if ($request->filled('id_procureur') && ! Dossier::communiqueAuParquet($dossier->type)) {
+            return response()->json(['errors' => ['id_procureur' => ["Ce type de dossier n'est pas communiqué au ministère public : aucun procureur ne peut y être assigné."]]], 422);
         }
 
         $procureurAChange = $request->has('id_procureur')
@@ -174,8 +195,33 @@ class DossierController extends Controller
     }
 
     // Avis du procureur sur le dossier, persisté côté serveur.
+    // Archivage manuel par le juge qui a présidé une audience du dossier, une
+    // fois la décision rendue.
+    public function archiver(Request $request, Dossier $dossier)
+    {
+        if ($dossier->estArchive()) {
+            return response()->json(['message' => 'Ce dossier est déjà archivé.'], 409);
+        }
+
+        if (! $dossier->audiences()->where('id_juge', $request->user()->id_utilisateur)->exists()) {
+            return response()->json(['message' => "Vous n'avez présidé aucune audience de ce dossier."], 403);
+        }
+
+        if (! in_array($dossier->statut, ['JUGE', 'CLOTURE'], true)) {
+            return response()->json(['message' => 'Seul un dossier jugé peut être archivé.'], 409);
+        }
+
+        $dossier->archiver();
+
+        return response()->json($dossier->fresh());
+    }
+
     public function donnerAvis(Request $request, Dossier $dossier)
     {
+        if (! $dossier->estAccessiblePar($request->user())) {
+            return response()->json(['message' => "Ce dossier n'est pas communiqué au ministère public."], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'avis' => 'required|string|max:4000',
         ]);

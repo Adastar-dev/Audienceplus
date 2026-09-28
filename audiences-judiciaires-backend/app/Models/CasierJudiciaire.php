@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\CodeQr;
 use Illuminate\Database\Eloquent\Model;
 
 class CasierJudiciaire extends Model
@@ -15,6 +16,14 @@ class CasierJudiciaire extends Model
     protected $casts = [
         'date_demandee' => 'datetime',
     ];
+
+    // QR code de la référence du casier (unique), affiché à l'utilisateur.
+    protected $appends = ['qr_image'];
+
+    public function getQrImageAttribute(): ?string
+    {
+        return $this->qr_code ? CodeQr::dataUri($this->qr_code) : null;
+    }
 
     public function utilisateur()
     {

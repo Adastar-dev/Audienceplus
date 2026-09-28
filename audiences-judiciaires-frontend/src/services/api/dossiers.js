@@ -20,6 +20,11 @@ export async function assignerProcureurDossier(id, idProcureur) {
   return data
 }
 
+export async function archiverDossier(id) {
+  const { data } = await apiClient.post(`/dossiers/${id}/archiver`)
+  return data
+}
+
 export async function donnerAvisDossier(id, avis) {
   const { data } = await apiClient.patch(`/dossiers/${id}/avis`, { avis })
   return data

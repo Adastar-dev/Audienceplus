@@ -121,7 +121,7 @@ export default function DossiersProcureur() {
               <>
                 {audienceLiee && (
                   <Link
-                    to={`/procureur/audiences/${audienceLiee.id_audience}/rejoindre`}
+                    to={`/procureur/salle-attente/${audienceLiee.id_audience}`}
                     className="flex items-center gap-2 bg-navy-900 text-white text-sm font-medium rounded px-4 py-2 hover:bg-navy-800 transition-colors w-fit"
                   >
                     <Video size={15} />

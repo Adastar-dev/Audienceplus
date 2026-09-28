@@ -4,17 +4,26 @@ namespace App\Http\Controllers;
 
 use App\Models\Audience;
 use App\Models\DemandeDistance;
+use App\Services\NotificationDispatcher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use App\Support\Messages;
 
 class DemandeDistanceController extends Controller
 {
+    public function __construct(private NotificationDispatcher $notifications)
+    {
+    }
+
     public function index(Request $request)
     {
         $query = DemandeDistance::with(['audience.dossier', 'utilisateur', 'greffierQuiADonneAvis']);
 
         if (! in_array($request->user()->role, ['GREFFIER', 'JUGE'], true)) {
             $query->where('id_utilisateur', $request->user()->id_utilisateur);
+        } else {
+            // Greffier et juge : seulement les dossiers de leur tribunal.
+            $query->whereHas('audience.dossier', fn ($q) => $q->visiblesPar($request->user()));
         }
 
         return response()->json($query->latest('date_demande')->get());
@@ -47,6 +56,12 @@ class DemandeDistanceController extends Controller
             'date_demande' => now(),
         ]);
 
+        $audience->loadMissing('dossier');
+        $this->notifications->notifierGreffiers(
+            $audience->dossier,
+            Messages::demandeDistance($audience, $request->user()->nom, $request->motif),
+        );
+
         return response()->json($demande, 201);
     }
 
@@ -76,6 +91,14 @@ class DemandeDistanceController extends Controller
             'avis_greffier_date' => now(),
         ]);
 
+        $demande->loadMissing('audience.dossier', 'audience.juge');
+        if ($juge = $demande->audience->juge) {
+            $this->notifications->envoyerMessage(
+                $juge,
+                Messages::distanceADecider($demande->audience, $request->avis),
+            );
+        }
+
         return response()->json($demande->load('greffierQuiADonneAvis'));
     }
 
@@ -94,6 +117,13 @@ class DemandeDistanceController extends Controller
             'date_traitement' => now(),
             'decide_par' => $request->user()->id_utilisateur,
         ]);
+
+        $demande->loadMissing('utilisateur', 'audience.dossier');
+        $this->notifications->envoyerMessage($demande->utilisateur, Messages::distanceAcceptee($demande->audience));
+        $this->notifications->notifierGreffiers(
+            $demande->audience->dossier,
+            Messages::distanceDecidee($demande->audience, $demande->utilisateur->nom, true),
+        );
 
         return response()->json($demande);
     }
@@ -120,6 +150,16 @@ class DemandeDistanceController extends Controller
             'date_traitement' => now(),
             'decide_par' => $request->user()->id_utilisateur,
         ]);
+
+        $demande->loadMissing('utilisateur', 'audience.dossier');
+        $this->notifications->envoyerMessage(
+            $demande->utilisateur,
+            Messages::distanceRefusee($demande->audience, $request->commentaire),
+        );
+        $this->notifications->notifierGreffiers(
+            $demande->audience->dossier,
+            Messages::distanceDecidee($demande->audience, $demande->utilisateur->nom, false, $request->commentaire),
+        );
 
         return response()->json($demande);
     }

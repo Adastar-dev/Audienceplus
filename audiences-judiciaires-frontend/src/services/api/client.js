@@ -1,7 +1,30 @@
 import axios from 'axios'
 
+const HOTES_LOCAUX = ['localhost', '127.0.0.1']
+
+// Adresse de l'API. Si elle pointe sur localhost alors que la page est ouverte
+// depuis une autre machine (un téléphone sur le même Wi-Fi, via l'adresse IP
+// du PC), on vise la même machine que la page : sur le téléphone, « localhost »
+// désignerait le téléphone lui-même.
+function adresseApi() {
+  const configuree = import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api'
+  const hotePage = window.location.hostname
+
+  try {
+    const url = new URL(configuree)
+    if (HOTES_LOCAUX.includes(url.hostname) && !HOTES_LOCAUX.includes(hotePage)) {
+      url.hostname = hotePage
+      return url.toString().replace(/\/$/, '')
+    }
+  } catch {
+    // Adresse relative ou invalide : utilisée telle quelle.
+  }
+
+  return configuree
+}
+
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api',
+  baseURL: adresseApi(),
   headers: {
     Accept: 'application/json',
   },

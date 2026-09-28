@@ -34,6 +34,13 @@ export async function listerProcureurs() {
   return data
 }
 
+// Photo de la CNI d'un compte (administrateur) : récupérée avec le jeton, puis
+// affichée via une URL locale.
+export async function urlPhotoCni(id, face = 'recto') {
+  const { data } = await apiClient.get(`/utilisateurs/${id}/cni`, { params: { face }, responseType: 'blob' })
+  return URL.createObjectURL(data)
+}
+
 export async function verifierIdentiteUtilisateur(id) {
   const { data } = await apiClient.post(`/utilisateurs/${id}/verifier-identite`)
   return data

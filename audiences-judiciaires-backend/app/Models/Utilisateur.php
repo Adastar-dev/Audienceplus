@@ -16,14 +16,27 @@ class Utilisateur extends Authenticatable
         'nom', 'email', 'mot_de_passe', 'role', 'telephone',
         'cni', 'numero_barreau', 'identite_verifiee', 'id_tribunal',
         'tentatives_echouees', 'bloque_jusqu_a',
+        'cni_photo_path', 'cni_verso_path', 'numero_cni_detecte', 'numero_cni_concorde',
     ];
 
-    protected $hidden = ['mot_de_passe', 'remember_token'];
+    protected $hidden = ['mot_de_passe', 'remember_token', 'cni_photo_path', 'cni_verso_path'];
 
     protected $casts = [
         'identite_verifiee' => 'boolean',
         'bloque_jusqu_a' => 'datetime',
+        'numero_cni_concorde' => 'boolean',
     ];
+
+    // Le chemin du fichier reste caché ; l'interface sait seulement si la
+    // photo de la CNI a été déposée.
+    protected $appends = ['a_photo_cni'];
+
+    public function getAPhotoCniAttribute(): bool
+    {
+        // Recto et verso déposés. Un compte déjà vérifié (avant l'ajout du
+        // verso) n'a pas à redéposer sa carte.
+        return (! empty($this->cni_photo_path) && ! empty($this->cni_verso_path)) || (bool) $this->identite_verifiee;
+    }
 
     public function getAuthPassword()
     {

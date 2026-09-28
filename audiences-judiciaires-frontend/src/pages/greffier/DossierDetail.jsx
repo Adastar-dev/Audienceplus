@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, FileText, Archive, Check, Loader2 } from 'lucide-react'
 import { getDossierById, assignerProcureurDossier } from '../../services/api/dossiers'
 import { listerProcureurs } from '../../services/api/utilisateurs'
-import { StatutDossier, TYPE_AUDIENCE_LABELS } from '../../constants/enums'
+import { StatutDossier, TYPE_AUDIENCE_LABELS, TYPES_AVEC_MINISTERE_PUBLIC } from '../../constants/enums'
 import DossierStatusBadge from '../../components/ui/DossierStatusBadge'
 import AudienceStatusBadge from '../../components/ui/AudienceStatusBadge'
 
@@ -87,11 +87,12 @@ export default function DossierDetail() {
         <Field label="Statut" value={<DossierStatusBadge statut={dossier.statut} />} />
       </div>
 
+      {TYPES_AVEC_MINISTERE_PUBLIC.includes(dossier.type) && (
       <div className="bg-white border border-slate-200 rounded-md p-5 mb-4">
         <h2 className="font-medium text-navy-900 mb-1">Procureur assigné</h2>
         <p className="text-xs text-slate-400 mb-3">
-          Procureur par défaut pour l'avis sur ce dossier. N'importe quel procureur peut tout de
-          même consulter le dossier et donner un avis si besoin.
+          Dossier communiqué au ministère public : procureur par défaut pour l'avis. Tout
+          procureur peut aussi consulter le dossier et donner un avis.
         </p>
         <select
           value={dossier.id_procureur ?? ''}
@@ -107,6 +108,7 @@ export default function DossierDetail() {
           ))}
         </select>
       </div>
+      )}
 
       {dossier.avis_procureur && (
         <div className="bg-white border border-slate-200 rounded-md p-5 mb-4">

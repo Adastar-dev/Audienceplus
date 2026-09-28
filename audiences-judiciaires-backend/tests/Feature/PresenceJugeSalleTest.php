@@ -76,13 +76,36 @@ class PresenceJugeSalleTest extends TestCase
     public function test_la_cloture_ferme_la_salle(): void
     {
         $juge = $this->creerUtilisateur('JUGE');
-        $audience = $this->audienceDeTest(['id_juge' => $juge->id_utilisateur, 'juge_connecte' => true]);
+        $audience = $this->audienceDeTest(['id_juge' => $juge->id_utilisateur, 'juge_connecte' => true, 'type_decision' => 'JUGEMENT']);
 
         $this->actingAs($juge, 'sanctum')
             ->postJson("/api/audiences/{$audience->id_audience}/fermer")
             ->assertOk();
 
         $this->assertFalse($audience->fresh()->juge_connecte);
+    }
+
+    public function test_une_audience_ne_se_ferme_pas_sans_decision(): void
+    {
+        $juge = $this->creerUtilisateur('JUGE');
+        $audience = $this->audienceDeTest(['id_juge' => $juge->id_utilisateur]);
+
+        $this->actingAs($juge, 'sanctum')
+            ->postJson("/api/audiences/{$audience->id_audience}/fermer")
+            ->assertStatus(422);
+
+        $this->assertSame('EN_COURS', $audience->fresh()->statut);
+    }
+
+    public function test_un_justiciable_etranger_au_dossier_ne_lit_pas_le_pv(): void
+    {
+        $audience = $this->audienceDeTest();
+        \App\Models\ProcesVerbal::create(['id_audience' => $audience->id_audience, 'contenu' => 'PV confidentiel.', 'statut' => 'CLOTURE']);
+        $curieux = $this->creerUtilisateur('JUSTICIABLE');
+
+        $this->actingAs($curieux, 'sanctum')
+            ->getJson("/api/audiences/{$audience->id_audience}/pv")
+            ->assertStatus(403);
     }
 
     private function lireJwt(string $jwt): array
@@ -182,10 +205,37 @@ class PresenceJugeSalleTest extends TestCase
             'identite_confirmee_otp' => true,
         ]);
 
+        // OTP confirmé mais pas encore admis : il attend (409).
+        $this->actingAs($justiciable, 'sanctum')
+            ->getJson("/api/audiences/{$audience->id_audience}/jitsi-jeton")
+            ->assertStatus(409)
+            ->assertJsonPath('en_attente_admission', true);
+
+        // Le greffier l'admet : il reçoit son jeton.
+        $greffier = $this->creerUtilisateur('GREFFIER');
+        $participation = \App\Models\ParticipationAudience::where('id_utilisateur', $justiciable->id_utilisateur)->firstOrFail();
+        $this->actingAs($greffier, 'sanctum')
+            ->postJson("/api/audiences/{$audience->id_audience}/participants/{$participation->id_participation}/admettre")
+            ->assertOk();
+
         $this->actingAs($justiciable, 'sanctum')
             ->getJson("/api/audiences/{$audience->id_audience}/jitsi-jeton")
             ->assertOk()
             ->assertJsonPath('moderateur', false);
+    }
+
+    public function test_un_avocat_partie_au_dossier_doit_aussi_confirmer_son_otp(): void
+    {
+        config(['services.jitsi.app_secret' => 'secret-de-test']);
+        $audience = $this->audienceDeTest(['juge_connecte' => true]);
+        $avocat = $this->creerUtilisateur('AVOCAT');
+        \App\Models\PartieDossier::create([
+            'id_dossier' => $audience->id_dossier, 'id_utilisateur' => $avocat->id_utilisateur, 'role_partie' => 'DEMANDEUR',
+        ]);
+
+        $this->actingAs($avocat, 'sanctum')
+            ->getJson("/api/audiences/{$audience->id_audience}/jitsi-jeton")
+            ->assertStatus(403);
     }
 
     public function test_un_avocat_etranger_au_dossier_na_pas_de_jeton(): void

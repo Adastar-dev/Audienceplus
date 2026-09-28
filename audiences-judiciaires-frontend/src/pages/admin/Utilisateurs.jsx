@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
-import { listerUtilisateurs, creerUtilisateur, updateUtilisateur, verifierIdentiteUtilisateur, supprimerUtilisateur } from '../../services/api/utilisateurs'
+import { listerUtilisateurs, creerUtilisateur, updateUtilisateur, verifierIdentiteUtilisateur, supprimerUtilisateur, urlPhotoCni } from '../../services/api/utilisateurs'
 import { Role, ROLE_LABELS } from '../../constants/enums'
 import Badge from '../../components/ui/Badge'
 import { ShieldCheck, ShieldAlert, Plus, Pencil, X, Loader2, Trash2 } from 'lucide-react'
 
-const VIDE = { nom: '', email: '', role: Role.JUSTICIABLE, telephone: '', cni: '', numero_barreau: '' }
+// Indicatif sénégalais prérempli ; un numéro étranger reste possible.
+const INDICATIF = '+221 '
+const VIDE = { nom: '', email: '', role: Role.JUSTICIABLE, telephone: INDICATIF, cni: '', numero_barreau: '' }
 
 export default function Utilisateurs() {
   const [utilisateurs, setUtilisateurs] = useState([])
@@ -14,6 +16,7 @@ export default function Utilisateurs() {
   const [enEdition, setEnEdition] = useState(null)
   const [form, setForm] = useState(VIDE)
   const [motDePasseTemp, setMotDePasseTemp] = useState(null)
+  const [erreurForm, setErreurForm] = useState('')
 
   useEffect(() => {
     listerUtilisateurs()
@@ -25,6 +28,7 @@ export default function Utilisateurs() {
   function ouvrirCreation() {
     setEnEdition(null)
     setForm(VIDE)
+    setErreurForm('')
     setMotDePasseTemp(null)
     setModalOuvert(true)
   }
@@ -35,16 +39,18 @@ export default function Utilisateurs() {
       nom: u.nom,
       email: u.email,
       role: u.role,
-      telephone: u.telephone || '',
+      telephone: u.telephone || INDICATIF,
       cni: u.cni || '',
       numero_barreau: u.numero_barreau || '',
     })
+    setErreurForm('')
     setMotDePasseTemp(null)
     setModalOuvert(true)
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
+    setErreurForm('')
     try {
       if (enEdition) {
         const updated = await updateUtilisateur(enEdition, form)
@@ -55,8 +61,12 @@ export default function Utilisateurs() {
         setUtilisateurs((list) => [...list, utilisateur])
         setMotDePasseTemp(mot_de_passe_temporaire)
       }
-    } catch {
-      setErreur("Impossible d'enregistrer l'utilisateur.")
+    } catch (err) {
+      setErreurForm(
+        err.response?.data?.errors
+          ? Object.values(err.response.data.errors).flat().join(' ')
+          : err.response?.data?.message || "Impossible d'enregistrer l'utilisateur.",
+      )
     }
   }
 
@@ -68,6 +78,14 @@ export default function Utilisateurs() {
       setUtilisateurs((list) => list.filter((x) => x.id_utilisateur !== u.id_utilisateur))
     } catch (err) {
       setErreur(err.response?.data?.message || 'Impossible de supprimer ce compte.')
+    }
+  }
+
+  async function voirCni(u, face) {
+    try {
+      window.open(await urlPhotoCni(u.id_utilisateur, face), '_blank', 'noopener')
+    } catch {
+      setErreur('Impossible d’afficher la photo de la CNI.')
     }
   }
 
@@ -114,6 +132,7 @@ export default function Utilisateurs() {
               <tr className="border-b border-slate-200 text-left text-slate-600">
                 <th className="px-4 py-3 font-medium">Nom</th>
                 <th className="px-4 py-3 font-medium">Email</th>
+                <th className="px-4 py-3 font-medium">Téléphone</th>
                 <th className="px-4 py-3 font-medium">Rôle</th>
                 <th className="px-4 py-3 font-medium">Identité</th>
                 <th className="px-4 py-3 font-medium"></th>
@@ -124,6 +143,9 @@ export default function Utilisateurs() {
                 <tr key={u.id_utilisateur} className="border-b border-slate-100 last:border-0">
                   <td className="px-4 py-3 font-medium text-navy-900">{u.nom}</td>
                   <td className="px-4 py-3 text-slate-600">{u.email}</td>
+                  <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
+                    {u.telephone || <span className="text-slate-400">—</span>}
+                  </td>
                   <td className="px-4 py-3">
                     <Badge tone="info">{ROLE_LABELS[u.role]}</Badge>
                   </td>
@@ -137,12 +159,31 @@ export default function Utilisateurs() {
                         <ShieldAlert size={13} /> Non vérifiée
                       </span>
                     )}
+                    {['AVOCAT', 'JUSTICIABLE'].includes(u.role) && (
+                      <div className="text-xs mt-1">
+                        {!u.a_photo_cni ? (
+                          <span className="text-slate-400">CNI : pas encore déposée</span>
+                        ) : (
+                          <>
+                            <span className={u.numero_cni_concorde === true ? 'text-success-700' : u.numero_cni_concorde === false ? 'text-danger-700' : 'text-gold-600'}>
+                              {u.numero_cni_concorde === true ? 'N° CNI concordant' : u.numero_cni_concorde === false ? 'N° CNI différent' : 'N° CNI non lu'}
+                            </span>
+                            <button onClick={() => voirCni(u, 'recto')} className="ml-2 text-navy-900 hover:underline">
+                              Recto
+                            </button>
+                            <button onClick={() => voirCni(u, 'verso')} className="ml-2 text-navy-900 hover:underline">
+                              Verso
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button onClick={() => ouvrirEdition(u)} className="text-slate-400 hover:text-navy-900">
                       <Pencil size={15} />
                     </button>
-                    {!u.identite_verifiee && ['AVOCAT', 'JUSTICIABLE'].includes(u.role) && (
+                    {!u.identite_verifiee && u.a_photo_cni && ['AVOCAT', 'JUSTICIABLE'].includes(u.role) && (
                       <button
                         onClick={() => verifier(u.id_utilisateur)}
                         title="Vérifier l'identité"
@@ -195,6 +236,9 @@ export default function Utilisateurs() {
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
+                {erreurForm && (
+                  <p className="bg-danger-100 text-danger-700 text-sm rounded px-3 py-2">{erreurForm}</p>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-slate-600 mb-1.5">Nom</label>
                   <input
@@ -227,6 +271,20 @@ export default function Utilisateurs() {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-600 mb-1.5">Téléphone</label>
+                  <input
+                    type="tel"
+                    value={form.telephone}
+                    onChange={(e) => setForm((f) => ({ ...f, telephone: e.target.value }))}
+                    placeholder="+221 77 000 00 00"
+                    className="w-full border border-slate-200 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-700"
+                  />
+                  <p className="text-xs text-slate-400 mt-1">
+                    Permet de se connecter avec son numéro ; les notifications et le code de vérification partent par email.
+                  </p>
                 </div>
 
                 {form.role === Role.JUSTICIABLE && (

@@ -72,6 +72,87 @@ class DossierPartiesTest extends TestCase
         $this->assertEquals(0, Dossier::count());
     }
 
+    public function test_une_procedure_gracieuse_se_cree_sans_defendeur(): void
+    {
+        $greffier = $this->creerUtilisateur('GREFFIER');
+        $requerant = $this->creerUtilisateur('JUSTICIABLE');
+        $tribunal = $this->tribunal();
+
+        $reponse = $this->actingAs($greffier, 'sanctum')->postJson('/api/dossiers', [
+            'type' => 'CHANGEMENT_NOM',
+            'id_tribunal' => $tribunal->id_tribunal,
+            'demandeur' => 'Awa Diop',
+            'id_demandeur_utilisateur' => $requerant->id_utilisateur,
+        ]);
+
+        $reponse->assertStatus(201)->assertJsonPath('parties', 'Requête de Awa Diop');
+        $this->assertDatabaseMissing('parties_dossier', [
+            'id_dossier' => $reponse->json('id_dossier'), 'role_partie' => 'DEFENDEUR',
+        ]);
+    }
+
+    public function test_une_procedure_gracieuse_refuse_un_defendeur(): void
+    {
+        $greffier = $this->creerUtilisateur('GREFFIER');
+        $tribunal = $this->tribunal();
+
+        $this->actingAs($greffier, 'sanctum')->postJson('/api/dossiers', [
+            'type' => 'ADOPTION',
+            'id_tribunal' => $tribunal->id_tribunal,
+            'demandeur' => 'Awa Diop',
+            'defendeur' => 'Quelqu\'un',
+        ])->assertStatus(422)->assertJsonValidationErrors('defendeur');
+
+        $this->assertEquals(0, Dossier::count());
+    }
+
+    public function test_un_divorce_exige_un_defendeur(): void
+    {
+        $greffier = $this->creerUtilisateur('GREFFIER');
+        $tribunal = $this->tribunal();
+
+        $this->actingAs($greffier, 'sanctum')->postJson('/api/dossiers', [
+            'type' => 'DIVORCE',
+            'id_tribunal' => $tribunal->id_tribunal,
+            'demandeur' => 'Awa Diop',
+        ])->assertStatus(422)->assertJsonValidationErrors('defendeur');
+    }
+
+    public function test_le_meme_compte_justiciable_des_deux_cotes_est_refuse(): void
+    {
+        $greffier = $this->creerUtilisateur('GREFFIER');
+        $justiciable = $this->creerUtilisateur('JUSTICIABLE');
+        $tribunal = $this->tribunal();
+
+        $this->actingAs($greffier, 'sanctum')->postJson('/api/dossiers', [
+            'type' => 'DIVORCE',
+            'id_tribunal' => $tribunal->id_tribunal,
+            'demandeur' => 'Awa Diop',
+            'defendeur' => 'Awa Diop',
+            'id_demandeur_utilisateur' => $justiciable->id_utilisateur,
+            'id_defendeur_utilisateur' => $justiciable->id_utilisateur,
+        ])->assertStatus(422)->assertJsonValidationErrors('parties');
+
+        $this->assertEquals(0, Dossier::count());
+    }
+
+    public function test_deux_personnes_differentes_peuvent_porter_le_meme_nom(): void
+    {
+        Mail::fake();
+        Http::fake();
+        $greffier = $this->creerUtilisateur('GREFFIER');
+        $tribunal = $this->tribunal();
+
+        $this->actingAs($greffier, 'sanctum')->postJson('/api/dossiers', [
+            'type' => 'DIVORCE',
+            'id_tribunal' => $tribunal->id_tribunal,
+            'demandeur' => 'Awa Diop',
+            'defendeur' => 'Awa Diop',
+            'id_demandeur_utilisateur' => $this->creerUtilisateur('JUSTICIABLE')->id_utilisateur,
+            'id_defendeur_utilisateur' => $this->creerUtilisateur('JUSTICIABLE')->id_utilisateur,
+        ])->assertStatus(201);
+    }
+
     public function test_la_numerotation_saute_un_numero_deja_pris(): void
     {
         Mail::fake();
@@ -89,7 +170,7 @@ class DossierPartiesTest extends TestCase
         ]);
 
         $reponse = $this->actingAs($greffier, 'sanctum')->postJson('/api/dossiers', [
-            'type' => 'ADOPTION',
+            'type' => 'DIVORCE',
             'id_tribunal' => $tribunal->id_tribunal,
             'demandeur' => 'C',
             'defendeur' => 'D',

@@ -11,9 +11,9 @@ const INTERVALLE_ATTENTE_MS = 5000
 // Page de visioconférence pour les participants non-juge : pas de contrôle
 // micro/caméra sur les autres, juste rejoindre et quitter.
 //
-// On attend que le juge soit connecté à la conférence (audience.juge_connecte)
-// avant de demander un jeton Jitsi : le backend le refuse sinon, et le juge
-// peut ainsi activer la salle d'attente avant que quiconque n'entre.
+// On attend que le juge soit connecté à la conférence (audience.juge_connecte),
+// puis que le greffier ou le juge admette la personne : le backend ne délivre
+// le jeton Jitsi qu'à ces conditions (et après le code de vérification).
 export default function RejoindreAudience({ backTo }) {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -23,6 +23,8 @@ export default function RejoindreAudience({ backTo }) {
   const [erreur, setErreur] = useState('')
   const [jeton, setJeton] = useState(null)
   const [erreurSalle, setErreurSalle] = useState('')
+  const [attenteAdmission, setAttenteAdmission] = useState(false)
+  const [tentative, setTentative] = useState(0)
 
   useEffect(() => {
     getAudienceById(id)
@@ -36,12 +38,26 @@ export default function RejoindreAudience({ backTo }) {
 
   // Une fois entré, on garde la conférence même si le juge se déconnecte
   // brièvement : seule l'entrée est conditionnée à sa présence.
+  // Tant que le greffier ou le juge ne l'a pas admis, l'API répond 409 :
+  // on réessaie toutes les 5 secondes.
   useEffect(() => {
     if (!salleOuverte || jeton) return
+    let timer
     getJetonJitsi(id)
-      .then(setJeton)
-      .catch((e) => setErreurSalle(e.response?.data?.message ?? "Impossible d'entrer dans la salle."))
-  }, [id, salleOuverte, jeton])
+      .then((j) => {
+        setAttenteAdmission(false)
+        setJeton(j)
+      })
+      .catch((e) => {
+        if (e.response?.status === 409 && e.response?.data?.en_attente_admission) {
+          setAttenteAdmission(true)
+          timer = setTimeout(() => setTentative((t) => t + 1), INTERVALLE_ATTENTE_MS)
+        } else {
+          setErreurSalle(e.response?.data?.message ?? "Impossible d'entrer dans la salle.")
+        }
+      })
+    return () => clearTimeout(timer)
+  }, [id, salleOuverte, jeton, tentative])
 
   useEffect(() => {
     if (!enAttente || salleOuverte) return
@@ -92,6 +108,14 @@ export default function RejoindreAudience({ backTo }) {
             displayName={user?.nom ?? 'Participant'}
             onLeft={() => navigate(backTo ?? -1)}
           />
+        ) : attenteAdmission ? (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-navy-100 text-sm text-center px-6">
+            <Loader2 size={24} className="animate-spin" />
+            <p className="font-display text-xl text-white">Salle d'attente</p>
+            <p className="max-w-sm">
+              Votre identité est confirmée. Le greffier ou le juge va vous faire entrer dans la salle d'audience.
+            </p>
+          </div>
         ) : erreurSalle ? (
           <div className="w-full h-full flex items-center justify-center text-navy-100 text-sm">{erreurSalle}</div>
         ) : enAttente ? (

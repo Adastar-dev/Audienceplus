@@ -4,11 +4,10 @@ import { listerAudiences } from '../../services/api/audiences'
 import { getPV, contesterPV } from '../../services/api/procesVerbaux'
 import { StatutPV } from '../../constants/enums'
 import AudienceStatusBadge from '../../components/ui/AudienceStatusBadge'
+import { LIBELLES_DECISION, decisionRendue, telechargerDecision } from '../../services/api/decisions'
 
-// NOTE : le backend n'a pas (encore) de vrai export PDF cote serveur
-// (ProcesVerbal.exporterPDF() du diagramme de classes n'est pas implemente) -
-// on genere donc ici un fichier texte simple a partir du contenu reel du PV,
-// en attendant un vrai generateur PDF.
+// La décision se télécharge en PDF (avec le PV une fois validé) ; le PV seul
+// reste disponible en texte brut.
 export default function HistoriqueAudiences() {
   const [audiences, setAudiences] = useState([])
   const [pvParAudience, setPvParAudience] = useState({})
@@ -92,6 +91,17 @@ export default function HistoriqueAudiences() {
                   </div>
                   <div className="flex items-center gap-3">
                     <AudienceStatusBadge statut={a.statut} />
+                    {decisionRendue(a) && (
+                      <button
+                        onClick={() =>
+                          telechargerDecision(a).catch(() => setErreur('Impossible de télécharger la décision.'))
+                        }
+                        className="flex items-center gap-1 text-xs text-navy-900 font-medium hover:underline"
+                      >
+                        <FileDown size={13} />
+                        {LIBELLES_DECISION[a.type_decision]}
+                      </button>
+                    )}
                     {(pv?.statut === StatutPV.CLOTURE || pv?.statut === StatutPV.CONTESTE) && (
                       <button
                         onClick={() => telecharger(a, pv)}

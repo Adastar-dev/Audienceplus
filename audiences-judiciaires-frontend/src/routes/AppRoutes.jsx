@@ -46,7 +46,8 @@ import Decisions from '../pages/justiciable/Decisions'
 import CasierJudiciaire from '../pages/justiciable/CasierJudiciaire'
 import DemandeDistance from '../pages/justiciable/DemandeDistance'
 import Notifications from '../pages/justiciable/Notifications'
-import SalleAttente from '../pages/justiciable/SalleAttente'
+import SalleAttente from '../pages/shared/SalleAttente'
+import MonCompte from '../pages/shared/MonCompte'
 import MessagerieJusticiable from '../pages/justiciable/Messagerie'
 
 
@@ -55,6 +56,7 @@ import Utilisateurs from '../pages/admin/Utilisateurs'
 import Tribunaux from '../pages/admin/Tribunaux'
 import ParametresSecurite from '../pages/admin/ParametresSecurite'
 import Logs from '../pages/admin/Logs'
+import Statistiques from '../pages/admin/Statistiques'
 
 import RejoindreAudience from '../pages/shared/RejoindreAudience'
 
@@ -105,6 +107,16 @@ export default function AppRoutes() {
         </Route>
       </Route>
 
+      {/* Première connexion d'un compte créé par l'administrateur (hors garde CNI). */}
+      <Route path="/completer-identite" element={<Navigate to="/compte" replace />} />
+
+      {/* Espace « Mon compte », commun à tous les rôles. */}
+      <Route element={<ProtectedRoute />}>
+        <Route element={<DashboardLayout />}>
+          <Route path="/compte" element={<MonCompte />} />
+        </Route>
+      </Route>
+
       <Route element={<ProtectedRoute allowedRoles={[Role.PROCUREUR]} />}>
         <Route element={<DashboardLayout />}>
           <Route path="/procureur" element={<ProcureurDashboard />} />
@@ -113,6 +125,7 @@ export default function AppRoutes() {
           <Route path="/procureur/notifications" element={<NotificationsProcureur />} />
           <Route path="/procureur/messagerie" element={<MessagerieProcureur />} />
         </Route>
+        <Route path="/procureur/salle-attente/:id" element={<SalleAttente />} />
         <Route
           path="/procureur/audiences/:id/rejoindre"
           element={<RejoindreAudience backTo="/procureur/dossiers" />}
@@ -127,7 +140,9 @@ export default function AppRoutes() {
           <Route path="/avocat/convocations" element={<ConvocationsAvocat />} />
           <Route path="/avocat/historique" element={<HistoriqueAudiences />} />
           <Route path="/avocat/messagerie" element={<Messagerie />} />
+          <Route path="/avocat/notifications" element={<Notifications />} />
         </Route>
+        <Route path="/avocat/salle-attente/:id" element={<SalleAttente />} />
         <Route
           path="/avocat/audiences/:id/rejoindre"
           element={<RejoindreAudience backTo="/avocat/dossiers" />}
@@ -158,6 +173,7 @@ export default function AppRoutes() {
           <Route path="/admin/tribunaux" element={<Tribunaux />} />
           <Route path="/admin/securite" element={<ParametresSecurite />} />
           <Route path="/admin/logs" element={<Logs />} />
+          <Route path="/admin/statistiques" element={<Statistiques />} />
         </Route>
       </Route>
 

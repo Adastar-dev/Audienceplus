@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\PartieDossier;
 use App\Models\Utilisateur;
+use App\Services\NotificationDispatcher;
+use App\Support\Telephone;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -21,14 +23,19 @@ class UtilisateurController extends Controller
     // accès internet accueilli au greffe) avec les mêmes champs que l'auto-inscription.
     public function store(Request $request)
     {
+        $request->merge(['telephone' => Telephone::normaliser($request->telephone)]);
+
         $validator = Validator::make($request->all(), [
             'nom' => 'required|string|max:255',
             'email' => 'required|email|unique:utilisateurs,email',
             'role' => 'required|in:JUGE,GREFFIER,PROCUREUR,AVOCAT,JUSTICIABLE,ADMINISTRATEUR',
             'id_tribunal' => 'nullable|exists:tribunaux,id_tribunal',
-            'telephone' => 'nullable|string|max:30',
+            'telephone' => ['nullable', 'string', Telephone::REGLE, 'unique:utilisateurs,telephone'],
             'cni' => 'required_if:role,JUSTICIABLE|nullable|string|max:30|unique:utilisateurs,cni',
             'numero_barreau' => 'required_if:role,AVOCAT|nullable|string|max:50',
+        ], [
+            'telephone.regex' => Telephone::MESSAGE,
+            'telephone.unique' => 'Ce numéro de téléphone est déjà associé à un compte.',
         ]);
 
         if ($validator->fails()) {
@@ -49,6 +56,8 @@ class UtilisateurController extends Controller
             'identite_verifiee' => false,
         ]);
 
+        app(NotificationDispatcher::class)->rappelerIdentiteSiNecessaire($utilisateur);
+
         return response()->json([
             'utilisateur' => $utilisateur,
             'mot_de_passe_temporaire' => $motDePasseTemporaire,
@@ -57,15 +66,21 @@ class UtilisateurController extends Controller
 
     public function update(Request $request, Utilisateur $utilisateur)
     {
+        if ($request->has('telephone')) {
+            $request->merge(['telephone' => Telephone::normaliser($request->telephone)]);
+        }
+
         $validator = Validator::make($request->all(), [
             'nom' => 'sometimes|string|max:255',
             'email' => 'sometimes|email|unique:utilisateurs,email,'.$utilisateur->id_utilisateur.',id_utilisateur',
             'role' => 'sometimes|in:JUGE,GREFFIER,PROCUREUR,AVOCAT,JUSTICIABLE,ADMINISTRATEUR',
-            'telephone' => 'sometimes|nullable|string|max:30|unique:utilisateurs,telephone,'.$utilisateur->id_utilisateur.',id_utilisateur',
+            'telephone' => ['sometimes', 'nullable', 'string', Telephone::REGLE, 'unique:utilisateurs,telephone,'.$utilisateur->id_utilisateur.',id_utilisateur'],
             'cni' => ['sometimes', 'nullable', 'string', 'regex:/^[0-9]{10,13}$/', 'unique:utilisateurs,cni,'.$utilisateur->id_utilisateur.',id_utilisateur'],
             'numero_barreau' => 'sometimes|nullable|string|max:50',
         ], [
             'cni.regex' => "Le numéro de CNI doit être composé de 10 à 13 chiffres.",
+            'telephone.regex' => Telephone::MESSAGE,
+            'telephone.unique' => 'Ce numéro de téléphone est déjà associé à un compte.',
         ]);
 
         if ($validator->fails()) {
@@ -133,6 +148,12 @@ class UtilisateurController extends Controller
     {
         if (! in_array($utilisateur->role, ['AVOCAT', 'JUSTICIABLE'], true)) {
             return response()->json(['message' => "Seul un compte avocat ou justiciable peut être vérifié de cette façon."], 422);
+        }
+
+        if (! $utilisateur->cni_photo_path || ! $utilisateur->cni_verso_path) {
+            return response()->json([
+                'message' => "Le titulaire n'a pas encore déposé le recto et le verso de sa CNI : impossible de vérifier le compte.",
+            ], 422);
         }
 
         $utilisateur->update(['identite_verifiee' => true]);

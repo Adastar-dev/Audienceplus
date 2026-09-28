@@ -2,28 +2,27 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, PenLine, Undo2, Loader2 } from 'lucide-react'
 import { getAudienceById } from '../../services/api/audiences'
-import { listerParticipants, marquerPresent, marquerAbsent } from '../../services/api/participants'
+import { listerParticipants, marquerPresent, marquerAbsent, admettreParticipant, refuserParticipant } from '../../services/api/participants'
 import { ROLE_LABELS } from '../../constants/enums'
 
-// Indicateurs de la salle d'attente, pour aider le greffier : le code SMS est
-// le seul verrou ; la lecture OCR du numéro de CNI n'est qu'indicative.
-function IndicateursIdentite({ participation }) {
-  if (!['JUSTICIABLE', 'AVOCAT'].includes(participation.role_audience)) return null
+// Indicateurs de la salle d'attente pour le greffier : compte vérifié par
+// l'administration (photo de CNI) et code de vérification confirmé.
+const ROLES_EN_SALLE_ATTENTE = ['JUSTICIABLE', 'AVOCAT', 'PROCUREUR']
 
-  const ocr = !participation.cni_photo_path
-    ? { texte: 'CNI : pas de photo', ton: 'text-slate-400' }
-    : participation.numero_cni_concorde === true
-      ? { texte: 'CNI : numéro concordant', ton: 'text-success-700' }
-      : participation.numero_cni_concorde === false
-        ? { texte: 'CNI : numéro différent', ton: 'text-danger-700' }
-        : { texte: 'CNI : numéro non lu', ton: 'text-gold-600' }
+function IndicateursIdentite({ participation }) {
+  if (!ROLES_EN_SALLE_ATTENTE.includes(participation.role_audience)) return null
+  const compteVerifie = participation.utilisateur?.identite_verifiee
 
   return (
     <p className="text-xs mt-0.5 flex gap-3">
       <span className={participation.identite_confirmee_otp ? 'text-success-700' : 'text-slate-400'}>
-        {participation.identite_confirmee_otp ? 'Code SMS confirmé' : 'Code SMS non confirmé'}
+        {participation.identite_confirmee_otp ? 'Code confirmé' : 'Code non confirmé'}
       </span>
-      <span className={ocr.ton}>{ocr.texte}</span>
+      {participation.role_audience !== 'PROCUREUR' && (
+        <span className={compteVerifie ? 'text-success-700' : 'text-danger-700'}>
+          {compteVerifie ? 'Compte vérifié' : 'Compte non vérifié'}
+        </span>
+      )}
     </p>
   )
 }
@@ -46,6 +45,28 @@ export default function Emargement() {
       .catch(() => setErreur('Impossible de charger cette audience.'))
       .finally(() => setChargement(false))
   }, [id])
+
+  // Rafraîchit la liste pour voir arriver les participants en salle d'attente.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      listerParticipants(id).then(setParticipants).catch(() => {})
+    }, 5000)
+    return () => clearInterval(timer)
+  }, [id])
+
+  async function handleAdmission(idParticipation, admettre) {
+    setEnCours(idParticipation)
+    try {
+      const maj = admettre
+        ? await admettreParticipant(id, idParticipation)
+        : await refuserParticipant(id, idParticipation)
+      setParticipants((list) => list.map((p) => (p.id_participation === idParticipation ? { ...p, ...maj } : p)))
+    } catch {
+      setErreur(admettre ? "Impossible d'admettre ce participant." : 'Impossible de refuser ce participant.')
+    } finally {
+      setEnCours(null)
+    }
+  }
 
   async function handleMarquerPresent(idParticipation) {
     setEnCours(idParticipation)
@@ -114,6 +135,27 @@ export default function Emargement() {
               <p className="text-sm font-medium text-navy-900">{p.utilisateur?.nom}</p>
               <p className="text-xs text-slate-400">{ROLE_LABELS[p.role_audience] ?? p.role_audience}</p>
               <IndicateursIdentite participation={p} />
+              {ROLES_EN_SALLE_ATTENTE.includes(p.role_audience) && p.identite_confirmee_otp && !p.admis && (
+                <div className="flex gap-2 mt-1.5">
+                  <button
+                    onClick={() => handleAdmission(p.id_participation, true)}
+                    disabled={enCours === p.id_participation}
+                    className="text-xs font-medium text-success-700 hover:underline disabled:opacity-40"
+                  >
+                    Faire entrer dans la salle
+                  </button>
+                  <button
+                    onClick={() => handleAdmission(p.id_participation, false)}
+                    disabled={enCours === p.id_participation}
+                    className="text-xs text-danger-700 hover:underline disabled:opacity-40"
+                  >
+                    Refuser
+                  </button>
+                </div>
+              )}
+              {ROLES_EN_SALLE_ATTENTE.includes(p.role_audience) && p.admis && (
+                <p className="text-xs text-success-700 mt-1">Admis dans la salle</p>
+              )}
             </div>
 
             {p.present ? (
@@ -137,7 +179,7 @@ export default function Emargement() {
                 className="flex items-center gap-1.5 bg-navy-900 text-white text-xs font-medium rounded px-3 py-1.5 hover:bg-navy-800 disabled:opacity-60 transition-colors"
               >
                 <PenLine size={13} />
-                {enCours === p.id_participation ? 'Signature...' : 'Marquer présent et signer'}
+                {enCours === p.id_participation ? 'Scellement...' : 'Marquer présent et sceller'}
               </button>
             )}
           </div>

@@ -35,6 +35,14 @@ export default function SalleAudience() {
       .finally(() => setChargement(false))
   }, [id])
 
+  // Rafraîchit la liste pour voir arriver les participants en salle d'attente.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      listerParticipants(id).then(setParticipants).catch(() => {})
+    }, 5000)
+    return () => clearInterval(timer)
+  }, [id])
+
   // Les participants n'obtiennent de jeton Jitsi qu'une fois ce signal reçu :
   // le juge est alors déjà dans la conférence (modérateur via son jeton) et a
   // activé la salle d'attente.

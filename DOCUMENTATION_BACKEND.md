@@ -52,24 +52,24 @@ Les comptes institutionnels (juge, greffier, procureur, administrateur) sont cr�
 Chaque dossier reçoit un numéro unique au format `TRB-DKR-année-séquence` (ex. `TRB-DKR-2026-0001`). Un dossier associe un demandeur et un défendeur (compte justiciable et/ou avocat le représentant). Visibilité restreinte aux parties et aux greffiers/juges/procureurs du tribunal concerné. Le procureur peut enregistrer un avis consultatif horodaté sur les dossiers dont le type le justifie (adoption, rectification d'acte, etc.).
 
 ### Programmation et déroulement des audiences
-À la programmation, les parties concernées sont automatiquement convoquées (notification SMS ou email). À l'ouverture d'une audience à distance (ou après approbation d'une demande de comparution à distance), une salle virtuelle Jitsi est attribuée automatiquement. À l'issue, le juge enregistre une décision (jugement, renvoi, délibéré), et le statut du dossier ainsi que les parties notifiées sont mis à jour en conséquence.
+À la programmation, les parties concernées sont automatiquement convoquées par email. À l'ouverture d'une audience à distance (ou après approbation d'une demande de comparution à distance), une salle virtuelle Jitsi est attribuée automatiquement. À l'issue, le juge enregistre une décision (jugement, renvoi, délibéré), et le statut du dossier ainsi que les parties notifiées sont mis à jour en conséquence.
 
 ### Procès-verbal et signature électronique
-Rédaction manuelle par le greffier, ou assistée par transcription automatique d'un enregistrement audio via l'API Whisper d'OpenAI (dégradation gracieuse si la transcription échoue). Cycle de validation : greffier → juge (validation = clôture définitive, ou rejet avec commentaire pour correction). Le scellement d'intégrité (appelé signature électronique dans le code) repose sur un hachage SHA-256 du contenu, recalculable à tout moment pour vérifier l'intégrité du document.
+Rédaction manuelle par le greffier, ou assistée par transcription automatique d'un enregistrement audio via le modèle Whisper de l'API Groq (dégradation gracieuse si la transcription échoue). Cycle de validation : greffier → juge (validation = clôture définitive, ou rejet avec commentaire pour correction). Le scellement d'intégrité (appelé signature électronique dans le code) repose sur un hachage SHA-256 du contenu, recalculable à tout moment pour vérifier l'intégrité du document.
 
 ### Notifications et convocations
-Convocations automatiques par SMS (API SMS Sénégal d'Orange) ou email selon les coordonnées disponibles. Confirmation ou demande de report par la partie convoquée (motif obligatoire), avis du greffier puis approbation/refus par le juge avec reprogrammation, relance possible par le greffier.
+Convocations automatiques par email, doublées d'une notification sur la plateforme ; rappels automatiques 48 heures et 2 heures avant l'audience. Confirmation ou demande de report par la partie convoquée (motif obligatoire), avis du greffier puis approbation/refus par le juge avec reprogrammation, relance possible par le greffier.
 
 ## Environnement et outils
 
 - **Langage/Framework** : PHP + Laravel (API RESTful)
 - **Base de données** : MySQL, via l'ORM Eloquent
 - **Authentification** : Laravel Sanctum
-- **Tests** : Pest/PHPUnit — 122 tests automatisés couvrant l'authentification et le contrôle des rôles, le cycle de vie dossier/audience, les demandes de comparution à distance, le dépôt/téléchargement des pièces, l'avis du procureur
+- **Tests** : Pest/PHPUnit — 170 tests automatisés couvrant l'authentification et le contrôle des rôles, le cycle de vie dossier/audience, les demandes de comparution à distance, le dépôt/téléchargement des pièces, l'avis du procureur
 - **Environnement local de développement** : XAMPP (Apache, MySQL, PHP)
 - **Tests automatisés** : exécutés sur une base SQLite en mémoire, isolée de la base MySQL de développement
 - **Sécurité** : protections intégrées Laravel contre CSRF et injections SQL ; validation stricte des données entrantes ; contrôle d'accès aux pièces jointes conditionné à la vérification d'identité ; journalisation des échecs d'intégration avec les services externes (sans exposition d'information sensible côté client)
 
 ## Architecture de déploiement cible
 
-En production : Nginx exposant l'API Laravel via PHP-FPM, base de données MySQL dédiée, stockage des pièces jointes, connexions sortantes vers les services externes (Jitsi Meet, API SMS Sénégal d'Orange, OpenAI) derrière HTTPS. Les secrets d'accès (clés API) sont externalisés dans des variables d'environnement non versionnées. Le backend et le frontend sont conteneurisés avec Docker, ce qui homogénéise les environnements et facilite le déploiement d'une juridiction à l'autre.
+En production : Nginx exposant l'API Laravel via PHP-FPM, base de données MySQL dédiée, stockage des pièces jointes, connexions sortantes vers les services externes (Jitsi Meet, serveur SMTP, Groq) derrière HTTPS. Les secrets d'accès (clés API) sont externalisés dans des variables d'environnement non versionnées. Le backend et le frontend sont conteneurisés avec Docker, ce qui homogénéise les environnements et facilite le déploiement d'une juridiction à l'autre.

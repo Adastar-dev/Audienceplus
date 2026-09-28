@@ -3,9 +3,12 @@
 use App\Http\Controllers\AudienceController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CasierJudiciaireController;
+use App\Http\Controllers\CompteController;
 use App\Http\Controllers\ConvocationController;
+use App\Http\Controllers\DecisionController;
 use App\Http\Controllers\DemandeDistanceController;
 use App\Http\Controllers\DossierController;
+use App\Http\Controllers\IdentiteController;
 use App\Http\Controllers\LogActiviteController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\NotificationController;
@@ -13,6 +16,7 @@ use App\Http\Controllers\ParticipationController;
 use App\Http\Controllers\PieceController;
 use App\Http\Controllers\ProcesVerbalController;
 use App\Http\Controllers\SignatureController;
+use App\Http\Controllers\StatistiqueController;
 use App\Http\Controllers\TribunalController;
 use App\Http\Controllers\UtilisateurController;
 use Illuminate\Support\Facades\Route;
@@ -23,11 +27,13 @@ Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/utilisateur', [AuthController::class, 'utilisateurConnecte']);
+    Route::patch('/mon-compte', [CompteController::class, 'completer'])->middleware('throttle:10,1');
 
     Route::get('/dossiers', [DossierController::class, 'index']);
     Route::get('/dossiers/{dossier}', [DossierController::class, 'show']);
     Route::post('/dossiers', [DossierController::class, 'store'])->middleware('role:GREFFIER');
     Route::patch('/dossiers/{dossier}', [DossierController::class, 'update'])->middleware('role:GREFFIER,JUGE');
+    Route::post('/dossiers/{dossier}/archiver', [DossierController::class, 'archiver'])->middleware('role:JUGE');
     Route::patch('/dossiers/{dossier}/avis', [DossierController::class, 'donnerAvis'])->middleware('role:PROCUREUR');
 
     Route::get('/dossiers/{dossier}/pieces', [PieceController::class, 'index']);
@@ -42,20 +48,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/audiences', [AudienceController::class, 'store'])->middleware('role:GREFFIER');
     Route::post('/audiences/{audience}/ouvrir', [AudienceController::class, 'ouvrir'])->middleware('role:JUGE');
     Route::post('/audiences/{audience}/fermer', [AudienceController::class, 'fermer'])->middleware('role:JUGE');
+    Route::get('/audiences/{audience}/decision/pdf', [DecisionController::class, 'pdf']);
     Route::get('/audiences/{audience}/jitsi-jeton', [AudienceController::class, 'jetonJitsi']);
     Route::post('/audiences/{audience}/juge-connecte', [AudienceController::class, 'jugeConnecte'])->middleware('role:JUGE');
     Route::post('/audiences/{audience}/juge-deconnecte', [AudienceController::class, 'jugeDeconnecte'])->middleware('role:JUGE');
     Route::post('/audiences/{audience}/decider', [AudienceController::class, 'decider'])->middleware('role:JUGE');
     Route::post('/audiences/{audience}/participants/{participation}/admettre', [AudienceController::class, 'admettreParticipant'])
-        ->middleware('role:JUGE');
+        ->middleware('role:JUGE,GREFFIER');
     Route::post('/audiences/{audience}/participants/{participation}/refuser', [AudienceController::class, 'refuserParticipant'])
-        ->middleware('role:JUGE');
+        ->middleware('role:JUGE,GREFFIER');
 
     Route::get('/audiences/{audience}/participants', [ParticipationController::class, 'index']);
-    Route::post('/audiences/{audience}/verification-identite/cni', [ParticipationController::class, 'enregistrerCni'])->middleware('throttle:10,1');
+    Route::post('/mon-identite/cni', [IdentiteController::class, 'deposerPhotoCni'])
+        ->middleware(['role:JUSTICIABLE,AVOCAT', 'throttle:10,1']);
     Route::post('/audiences/{audience}/verification-identite/otp/envoyer', [ParticipationController::class, 'envoyerOtp'])->middleware('throttle:3,1');
     Route::post('/audiences/{audience}/verification-identite/otp/verifier', [ParticipationController::class, 'verifierOtp'])->middleware('throttle:5,1');
-    Route::get('/audiences/{audience}/participants/{participation}/cni', [ParticipationController::class, 'cniPhoto']);
     Route::post('/audiences/{audience}/participants/{participation}/marquer-present', [ParticipationController::class, 'marquerPresent'])
         ->middleware('role:GREFFIER');
     Route::post('/audiences/{audience}/participants/{participation}/marquer-absent', [ParticipationController::class, 'marquerAbsent'])
@@ -103,6 +110,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/casier-judiciaire', [CasierJudiciaireController::class, 'index'])->middleware('role:JUSTICIABLE');
     Route::post('/casier-judiciaire', [CasierJudiciaireController::class, 'store'])->middleware('role:JUSTICIABLE');
+    Route::get('/casier-judiciaire/{casier}/pdf', [CasierJudiciaireController::class, 'pdf'])->middleware('role:JUSTICIABLE');
 
     Route::middleware('role:ADMINISTRATEUR')->group(function () {
         Route::get('/utilisateurs', [UtilisateurController::class, 'index']);
@@ -111,10 +119,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/utilisateurs/{utilisateur}', [UtilisateurController::class, 'destroy']);
         Route::get('/comptes-a-verifier', [UtilisateurController::class, 'comptesAVerifier']);
         Route::post('/utilisateurs/{utilisateur}/verifier-identite', [UtilisateurController::class, 'verifierIdentite']);
+        Route::get('/utilisateurs/{utilisateur}/cni', [IdentiteController::class, 'photoCni']);
 
         Route::post('/tribunaux', [TribunalController::class, 'store']);
 
         Route::get('/logs', [LogActiviteController::class, 'index']);
+        Route::get('/statistiques', [StatistiqueController::class, 'index']);
     });
 
     Route::get('/tribunaux', [TribunalController::class, 'index']);

@@ -3,9 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Audience;
+use App\Models\LogActivite;
 use App\Models\ParticipationAudience;
 use App\Models\Signature;
-use App\Services\CniOcrService;
 use App\Services\DocumentHashService;
 use App\Services\OtpService;
 use Illuminate\Http\Request;
@@ -16,7 +16,6 @@ class ParticipationController extends Controller
 {
     public function __construct(
         private OtpService $otp,
-        private CniOcrService $cniOcr,
         private DocumentHashService $hasher,
     ) {
     }
@@ -75,52 +74,6 @@ class ParticipationController extends Controller
         return response()->json($participation);
     }
 
-    public function enregistrerCni(Request $request, Audience $audience)
-    {
-        $validator = Validator::make($request->all(), [
-            'cni' => 'required|image|mimes:jpg,jpeg,png|max:5120',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
-        }
-
-        $mime = $request->file('cni')->getMimeType();
-        if (! str_starts_with($mime, 'image/')) {
-            return response()->json(['errors' => ['cni' => ["Le fichier n'est pas une image valide."]]], 422);
-        }
-
-        $participation = ParticipationAudience::firstOrCreate(
-            ['id_audience' => $audience->id_audience, 'id_utilisateur' => $request->user()->id_utilisateur],
-            ['role_audience' => $request->user()->role]
-        );
-
-        $chemin = $request->file('cni')->store('cni-verification', 'local');
-        $participation->update(['cni_photo_path' => $chemin]);
-
-        $this->verifierNumeroCni($participation);
-
-        return response()->json($participation);
-    }
-
-    // Verifie que le numero OCR de la CNI correspond au CNI declare a
-    // l'inscription — un indicateur pour le greffier/juge, jamais un blocage
-    // automatique (l'OCR se trompe facilement sur une photo prise au telephone).
-    // La comparaison faciale (Face++) et le selfie ont ete retires au profit d'un
-    // code OTP par SMS, voir envoyerOtp/verifierOtp ci-dessous.
-    private function verifierNumeroCni(ParticipationAudience $participation): void
-    {
-        $numeroDetecte = $this->cniOcr->extraireNumero(Storage::disk('local')->path($participation->cni_photo_path));
-        $numeroDeclare = $participation->utilisateur->cni ?? null;
-
-        $participation->update([
-            'numero_cni_detecte' => $numeroDetecte,
-            'numero_cni_concorde' => ($numeroDetecte !== null && $numeroDeclare !== null)
-                ? $numeroDetecte === $numeroDeclare
-                : null,
-        ]);
-    }
-
     private const OUVERTURE_AVANT_MINUTES = 30;
 
     // La salle d'attente virtuelle n'est accessible que dans une fenetre autour
@@ -148,7 +101,7 @@ class ParticipationController extends Controller
         return null;
     }
 
-    // Verification d'identite par code OTP envoye par SMS, condition d'entree
+    // Verification d'identite par code OTP envoye par email, condition d'entree
     // dans la salle d'attente virtuelle (App\Services\OtpService).
     public function envoyerOtp(Request $request, Audience $audience)
     {
@@ -163,11 +116,11 @@ class ParticipationController extends Controller
 
         if (! $this->otp->envoyer($participation)) {
             return response()->json([
-                'message' => "Aucun numéro de téléphone n'est associé à votre compte. Demandez à l'administrateur de l'ajouter pour recevoir le code.",
+                'message' => "Aucune adresse email n'est associée à votre compte. Demandez à l'administrateur d'en ajouter une pour recevoir le code.",
             ], 422);
         }
 
-        return response()->json(['message' => 'Code envoyé par SMS.']);
+        return response()->json(['message' => 'Code envoyé par email.']);
     }
 
     public function verifierOtp(Request $request, Audience $audience)
@@ -198,26 +151,15 @@ class ParticipationController extends Controller
         ];
 
         if ($resultat !== 'ok') {
+            LogActivite::create([
+                'id_utilisateur' => $request->user()->id_utilisateur,
+                'action' => "Code de vérification refusé ({$resultat}) - audience n°{$audience->id_audience}",
+                'adresse_ip' => $request->ip(),
+            ]);
+
             return response()->json(['message' => $messages[$resultat]], 422);
         }
 
         return response()->json($participation->fresh());
-    }
-
-    public function cniPhoto(Request $request, Audience $audience, ParticipationAudience $participation)
-    {
-        $utilisateur = $request->user();
-        $autorise = in_array($utilisateur->role, ['GREFFIER', 'JUGE', 'ADMINISTRATEUR'], true)
-            || $utilisateur->id_utilisateur === $participation->id_utilisateur;
-
-        if (! $autorise) {
-            abort(403);
-        }
-
-        if (! $participation->cni_photo_path || ! Storage::disk('local')->exists($participation->cni_photo_path)) {
-            abort(404);
-        }
-
-        return Storage::disk('local')->response($participation->cni_photo_path);
     }
 }

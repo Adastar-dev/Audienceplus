@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
-import { LogOut, Scale, Menu, X } from 'lucide-react'
+import { Link, NavLink, Outlet } from 'react-router-dom'
+import { IdCard, LogOut, Scale, Menu, UserRound, X } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { NAV_BY_ROLE } from '../../constants/navigation'
 import { ROLE_LABELS } from '../../constants/enums'
@@ -50,6 +50,14 @@ export default function DashboardLayout() {
       <div className="px-5 py-4 border-t border-navy-700">
         <p className="text-xs text-navy-100">{user?.nom}</p>
         <p className="text-xs text-gold-600 mb-3">{ROLE_LABELS[role]}</p>
+        <NavLink
+          to="/compte"
+          onClick={() => setMenuOuvert(false)}
+          className="flex items-center gap-1.5 text-xs text-navy-100 hover:text-white transition-colors mb-2"
+        >
+          <UserRound size={14} />
+          Mon compte
+        </NavLink>
         <button
           onClick={logout}
           className="flex items-center gap-1.5 text-xs text-navy-100 hover:text-white transition-colors"
@@ -98,6 +106,19 @@ export default function DashboardLayout() {
         </header>
 
         <main className="flex-1 min-w-0">
+          {/* Justiciable ou avocat sans photo complète de sa carte d'identité. */}
+          {['JUSTICIABLE', 'AVOCAT'].includes(role) && user?.a_photo_cni === false && (
+            <Link
+              to="/compte"
+              className="flex items-center gap-2 bg-gold-100 text-navy-900 text-sm px-4 sm:px-8 py-2.5 hover:bg-gold-100/70"
+            >
+              <IdCard size={16} className="shrink-0 text-gold-600" />
+              <span>
+                Votre compte n'est pas encore complet : <strong>déposez le recto et le verso de votre carte d'identité</strong>{' '}
+                pour qu'il soit vérifié.
+              </span>
+            </Link>
+          )}
           <div className="max-w-5xl mx-auto px-4 sm:px-8 py-6 sm:py-8">
             <Outlet />
           </div>

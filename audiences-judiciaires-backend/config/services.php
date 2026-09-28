@@ -23,15 +23,16 @@ return [
         ],
     ],
 
-    'orange' => [
-        'client_id' => env('ORANGE_CLIENT_ID'),
-        'client_secret' => env('ORANGE_CLIENT_SECRET'),
-        // Format tel:+221XXXXXXXXX, fourni par Orange lors de l'approbation de l'app.
-        'sender_address' => env('ORANGE_SENDER_ADDRESS'),
-    ],
-
-    'openai' => [
-        'api_key' => env('OPENAI_API_KEY'),
+    // Fournisseur d'IA pour la transcription audio (Whisper) et la lecture du
+    // numéro de CNI (modèle de vision). Toute API au format OpenAI convient :
+    // Groq par défaut (offre gratuite, sans carte bancaire) ; pour revenir à
+    // OpenAI, IA_BASE_URL=https://api.openai.com/v1 et les modèles
+    // whisper-1 / gpt-4o-mini.
+    'ia' => [
+        'base_url' => rtrim(env('IA_BASE_URL', 'https://api.groq.com/openai/v1'), '/'),
+        'api_key' => env('IA_API_KEY'),
+        'modele_transcription' => env('IA_MODELE_TRANSCRIPTION', 'whisper-large-v3'),
+        'modele_vision' => env('IA_MODELE_VISION', 'qwen/qwen3.8-27b'),
     ],
 
     // Serveur Jitsi auto-heberge avec authentification JWT. Sans secret, on

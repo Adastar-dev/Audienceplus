@@ -4,10 +4,10 @@ namespace App\Services;
 
 use App\Models\ParticipationAudience;
 use Illuminate\Support\Facades\Hash;
+use App\Support\Messages;
 
-// Remplace la comparaison faciale (Face++, voir FaceComparisonService retire) comme
-// verification d'identite avant l'entree en salle d'attente virtuelle : un code a 6
-// chiffres envoye par SMS au numero du compte, a saisir pour confirmer l'identite.
+// Vérification d'identité avant l'entrée en salle d'attente virtuelle : un code
+// à 6 chiffres envoyé par email, à saisir pour confirmer l'identité. Remplace la comparaison faciale (Face++).
 class OtpService
 {
     private const DUREE_VALIDITE_MINUTES = 5;
@@ -18,11 +18,12 @@ class OtpService
     {
     }
 
+    // Renvoie false si le compte n'a pas d'adresse email.
     public function envoyer(ParticipationAudience $participation): bool
     {
         $utilisateur = $participation->utilisateur;
 
-        if (! $utilisateur->telephone) {
+        if (! $utilisateur->email) {
             return false;
         }
 
@@ -35,10 +36,10 @@ class OtpService
             'identite_confirmee_otp' => false,
         ]);
 
-        $this->notifications->envoyerLibre(
+        // Jamais de code en clair dans les notifications de la plateforme.
+        $this->notifications->envoyerMessage(
             $utilisateur,
-            'Code de vérification',
-            "Votre code d'accès à l'audience : {$code} (valable ".self::DUREE_VALIDITE_MINUTES.' minutes).',
+            Messages::codeVerification($code, self::DUREE_VALIDITE_MINUTES),
         );
 
         return true;

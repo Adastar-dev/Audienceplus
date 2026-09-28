@@ -61,10 +61,9 @@ export default function JitsiMeetRoom({ domain, roomName, jwt, displayName, mode
         })
         apiRef.current = api
 
+        // L'admission des participants se fait dans l'application (greffier ou
+        // juge) avant la délivrance du jeton : pas de salle d'attente Jitsi en plus.
         api.addEventListener('videoConferenceJoined', () => {
-          // Le lobby ne peut être activé qu'une fois la conférence rejointe
-          // (le juge doit être reconnu comme modérateur côté Jitsi).
-          if (moderator) api.executeCommand('toggleLobby', true)
           onJoinedRef.current?.()
         })
         // Déclenché quand on raccroche, ou quand le juge termine la conférence

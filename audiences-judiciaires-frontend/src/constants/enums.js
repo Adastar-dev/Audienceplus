@@ -23,6 +23,25 @@ export const TypeAudience = {
   EMANCIPATION: 'EMANCIPATION',
 }
 
+// Procédures gracieuses : introduites par requête, sans défendeur. Doit rester
+// identique à Dossier::TYPES_SANS_DEFENDEUR côté backend.
+export const TYPES_SANS_DEFENDEUR = [
+  TypeAudience.CHANGEMENT_NOM,
+  TypeAudience.RECTIFICATION_ACTE,
+  TypeAudience.ADOPTION,
+  TypeAudience.TUTELLE,
+  TypeAudience.DECLARATION_ABSENCE_DECES,
+  TypeAudience.EMANCIPATION,
+]
+
+// Dossiers communiqués au ministère public (procureur). Doit rester identique
+// à Dossier::TYPES_AVEC_MINISTERE_PUBLIC côté backend.
+export const TYPES_AVEC_MINISTERE_PUBLIC = [
+  TypeAudience.ADOPTION,
+  TypeAudience.FILIATION,
+  TypeAudience.TUTELLE,
+]
+
 export const TYPE_AUDIENCE_LABELS = {
   [TypeAudience.DIVORCE]: 'Divorce et séparation de corps',
   [TypeAudience.ADOPTION]: 'Adoption',
@@ -41,6 +60,7 @@ export const StatutDossier = {
   RENVOYE: 'RENVOYE',
   JUGE: 'JUGE',
   CLOTURE: 'CLOTURE',
+  ARCHIVE: 'ARCHIVE',
 }
 
 export const StatutAudience = {
@@ -75,7 +95,6 @@ export const STATUT_DEMANDE_DISTANCE_LABELS = {
 
 export const StatutConvocation = {
   ENVOYEE: 'ENVOYEE',
-  RECUE: 'RECUE',
   CONFIRMEE: 'CONFIRMEE',
   REPORT_DEMANDE: 'REPORT_DEMANDE',
   AVIS_GREFFIER_FAVORABLE: 'AVIS_GREFFIER_FAVORABLE',
@@ -98,8 +117,6 @@ export const ResultatCasier = {
 
 export const CanalNotification = {
   EMAIL: 'EMAIL',
-  SMS: 'SMS',
-  APPEL_VOCAL: 'APPEL_VOCAL',
   IN_APP: 'IN_APP',
 }
 
@@ -109,6 +126,7 @@ export const STATUT_DOSSIER_LABELS = {
   [StatutDossier.RENVOYE]: 'Renvoyé',
   [StatutDossier.JUGE]: 'Jugé',
   [StatutDossier.CLOTURE]: 'Clôturé',
+  [StatutDossier.ARCHIVE]: 'Archivé',
 }
 
 export const STATUT_AUDIENCE_LABELS = {
@@ -129,7 +147,6 @@ export const STATUT_PV_LABELS = {
 
 export const STATUT_CONVOCATION_LABELS = {
   [StatutConvocation.ENVOYEE]: 'Envoyée',
-  [StatutConvocation.RECUE]: 'Reçue',
   [StatutConvocation.CONFIRMEE]: 'Présence confirmée',
   [StatutConvocation.REPORT_DEMANDE]: 'Report demandé',
   [StatutConvocation.AVIS_GREFFIER_FAVORABLE]: 'Avis favorable du greffe — en attente du juge',

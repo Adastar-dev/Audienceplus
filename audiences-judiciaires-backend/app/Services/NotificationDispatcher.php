@@ -3,10 +3,11 @@
 namespace App\Services;
 
 use App\Models\Convocation;
+use App\Models\Dossier;
 use App\Models\Notification;
 use App\Models\Utilisateur;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
+use App\Support\Message;
+use App\Support\Messages;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
@@ -15,122 +16,117 @@ class NotificationDispatcher
     public function envoyerConvocation(Convocation $convocation): void
     {
         $convocation->loadMissing(['utilisateur', 'audience.dossier']);
-        $audience = $convocation->audience;
-
-        $message = sprintf(
-            'Convocation : vous êtes attendu(e) au tribunal le %s pour le dossier %s.',
-            $audience->date_heure->translatedFormat('d/m/Y à H:i'),
-            $audience->dossier->numero,
-        );
-
-        $this->envoyer($convocation->utilisateur, $convocation->canal, 'Convocation', $message);
+        $this->envoyerMessage($convocation->utilisateur, Messages::convocation($convocation->audience));
     }
 
     public function envoyerRappel(Convocation $convocation): void
     {
         $convocation->loadMissing(['utilisateur', 'audience.dossier']);
-        $audience = $convocation->audience;
-
-        $message = sprintf(
-            'Rappel : audience prévue le %s pour le dossier %s.',
-            $audience->date_heure->translatedFormat('d/m/Y à H:i'),
-            $audience->dossier->numero,
-        );
-
-        $this->envoyer($convocation->utilisateur, $convocation->canal, 'Rappel', $message);
+        $this->envoyerMessage($convocation->utilisateur, Messages::rappel($convocation->audience));
     }
 
-    public function envoyerLibre(Utilisateur $utilisateur, string $type, string $message): void
-    {
-        $this->envoyer($utilisateur, $utilisateur->telephone ? 'SMS' : 'EMAIL', $type, $message);
-    }
-
-    private function envoyer(Utilisateur $utilisateur, string $canal, string $type, string $message): void
+    // Chaque message part par email et apparaît dans les notifications de la
+    // plateforme.
+    public function envoyerMessage(Utilisateur $utilisateur, Message $message): void
     {
         Notification::create([
             'id_utilisateur' => $utilisateur->id_utilisateur,
-            'type' => $type,
-            'message' => $message,
+            'type' => $message->type,
+            'message' => $message->notificationPlateforme ?? $message->texte,
             'lu' => false,
             'date_envoi' => now(),
+            'id_audience' => $message->idAudience,
+            'lien' => $message->lien,
         ]);
 
+        if ($utilisateur->email) {
+            $this->tenter($utilisateur, fn () => $this->envoyerEmail($utilisateur, $message));
+        }
+    }
+
+    // Justiciable ou avocat sans photo complète de sa carte d'identité : une
+    // notification (plateforme et email) l'invite à la déposer, sans doublon
+    // tant que la précédente n'a pas été lue.
+    public function rappelerIdentiteSiNecessaire(Utilisateur $utilisateur): void
+    {
+        if (! in_array($utilisateur->role, ['JUSTICIABLE', 'AVOCAT'], true) || $utilisateur->a_photo_cni) {
+            return;
+        }
+
+        $dejaPrevenu = Notification::where('id_utilisateur', $utilisateur->id_utilisateur)
+            ->where('type', 'Identité à compléter')
+            ->where('lu', false)
+            ->exists();
+
+        if (! $dejaPrevenu) {
+            $this->envoyerMessage($utilisateur, Messages::identiteACompleter());
+        }
+    }
+
+    // Prévient les greffiers du tribunal du dossier ; si aucun greffier n'est
+    // rattaché à ce tribunal, tous les greffiers, pour que la demande ne reste
+    // pas sans réponse.
+    public function notifierGreffiers(Dossier $dossier, Message $message): void
+    {
+        $greffiers = Utilisateur::where('role', 'GREFFIER')->where('id_tribunal', $dossier->id_tribunal)->get();
+
+        if ($greffiers->isEmpty()) {
+            $greffiers = Utilisateur::where('role', 'GREFFIER')->get();
+        }
+
+        foreach ($greffiers as $greffier) {
+            $this->envoyerMessage($greffier, $message);
+        }
+    }
+
+    private function tenter(Utilisateur $utilisateur, callable $envoi): void
+    {
         try {
-            match ($canal) {
-                'SMS', 'APPEL_VOCAL' => $this->envoyerSms($utilisateur->telephone, $message),
-                'EMAIL' => $this->envoyerEmail($utilisateur->email, $type, $message),
-                default => null,
-            };
+            $envoi();
         } catch (\Throwable $e) {
-            Log::warning("NotificationDispatcher: échec d'envoi {$canal} à l'utilisateur {$utilisateur->id_utilisateur} - ".$e->getMessage());
+            Log::warning("NotificationDispatcher: échec d'envoi de l'email à l'utilisateur {$utilisateur->id_utilisateur} - ".$e->getMessage());
         }
     }
 
-    // Envoi via l'API SMS Sénégal d'Orange (OAuth2 client_credentials + envoi
-    // REST). Numéros stockés en base déjà au format international (+221...).
-    private function envoyerSms(?string $telephone, string $message): void
+    private function envoyerEmail(Utilisateur $utilisateur, Message $message): void
     {
-        if (! $telephone) {
-            return;
-        }
+        $sujet = 'Audience+ — '.$message->type
+            .(isset($message->details['Dossier']) ? ' — dossier '.$message->details['Dossier'] : '');
 
-        $sender = config('services.orange.sender_address');
-        $token = $this->obtenirTokenOrange();
-
-        if (! $sender || ! $token) {
-            return;
-        }
-
-        Http::withToken($token)
-            ->withHeaders(['Accept' => 'application/json'])
-            ->post('https://api.orange.com/smsmessaging/v1/outbound/'.rawurlencode($sender).'/requests', [
-                'outboundSMSMessageRequest' => [
-                    'address' => 'tel:'.$telephone,
-                    'senderAddress' => $sender,
-                    'outboundSMSTextMessage' => ['message' => $message],
-                ],
-            ]);
-    }
-
-    // Le token OAuth2 Orange n'est valable qu'une heure : on le met en cache
-    // pour éviter une authentification à chaque SMS.
-    private function obtenirTokenOrange(): ?string
-    {
-        $clientId = config('services.orange.client_id');
-        $clientSecret = config('services.orange.client_secret');
-
-        if (! $clientId || ! $clientSecret) {
-            return null;
-        }
-
-        $token = Cache::get('orange_sms_token');
-        if ($token) {
-            return $token;
-        }
-
-        $reponse = Http::asForm()
-            ->withBasicAuth($clientId, $clientSecret)
-            ->withHeaders(['Accept' => 'application/json'])
-            ->post('https://api.orange.com/oauth/v3/token', ['grant_type' => 'client_credentials']);
-
-        if (! $reponse->successful()) {
-            return null;
-        }
-
-        $token = $reponse->json('access_token');
-        Cache::put('orange_sms_token', $token, now()->addMinutes(55));
-
-        return $token;
-    }
-
-    private function envoyerEmail(?string $email, string $sujet, string $message): void
-    {
-        if (! $email) {
-            return;
-        }
-
-        Mail::raw($message, function ($mail) use ($email, $sujet) {
-            $mail->to($email)->subject("Audiences judiciaires — {$sujet}");
+        Mail::raw($this->corpsEmail($utilisateur, $message), function ($mail) use ($utilisateur, $sujet) {
+            $mail->to($utilisateur->email)->subject($sujet);
         });
+    }
+
+    private function corpsEmail(Utilisateur $utilisateur, Message $message): string
+    {
+        $lignes = ["Bonjour {$utilisateur->nom},", '', $message->texte];
+
+        if ($message->details) {
+            $lignes[] = '';
+            foreach ($message->details as $libelle => $valeur) {
+                $lignes[] = "• {$libelle} : {$valeur}";
+            }
+        }
+
+        if ($message->action) {
+            $lignes[] = '';
+            $lignes[] = $message->action;
+        }
+
+        array_push(
+            $lignes,
+            '',
+            'Accéder à votre espace Audience+ : '.config('app.frontend_url'),
+            '',
+            'Cordialement,',
+            "L'équipe Audience+",
+            '',
+            '—',
+            "Ce message vous est envoyé automatiquement par Audience+, la plateforme de gestion des audiences d'état civil. "
+                ."Merci de ne pas y répondre : pour toute question, adressez-vous au greffe du tribunal.",
+        );
+
+        return implode("\n", $lignes);
     }
 }

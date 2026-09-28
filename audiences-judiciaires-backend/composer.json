@@ -4,6 +4,8 @@
     "description": "API backend - Plateforme d'audiences judiciaires a distance (memoire ESMT DAR26/LPTI)",
     "require": {
         "php": "^8.2",
+        "barryvdh/laravel-dompdf": "^3.1",
+        "chillerlan/php-qrcode": "^6.0",
         "laravel/framework": "^12.0",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.9"

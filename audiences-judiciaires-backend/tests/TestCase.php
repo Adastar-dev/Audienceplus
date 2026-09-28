@@ -6,9 +6,20 @@ use App\Models\Tribunal;
 use App\Models\Utilisateur;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 
 abstract class TestCase extends BaseTestCase
 {
+    // Aucun appel HTTP réel pendant les tests (API d'IA, Jitsi...) : un test
+    // qui n'a pas simulé ses appels avec Http::fake() échoue au lieu
+    // d'appeler le vrai service.
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Http::preventStrayRequests();
+    }
+
     // Garde-fou : RefreshDatabase efface toutes les tables. On refuse de lancer
     // un test si la connexion n'est pas SQLite en mémoire, pour ne jamais
     // toucher la base MySQL de développement.

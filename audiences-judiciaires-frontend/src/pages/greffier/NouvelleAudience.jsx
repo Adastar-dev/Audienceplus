@@ -19,6 +19,8 @@ export default function NouvelleAudience() {
   const [idJuge, setIdJuge] = useState('')
   const [date, setDate] = useState('')
   const [heure, setHeure] = useState('09:00')
+  // Créneaux libres proposés par le serveur quand le juge est déjà pris.
+  const [creneauxLibres, setCreneauxLibres] = useState([])
 
   useEffect(() => {
     Promise.all([listerDossiers(), listerJuges(), listerAudiences()])
@@ -42,14 +44,10 @@ export default function NouvelleAudience() {
 
   const jugeSelectionne = juges.find((j) => String(j.id_utilisateur) === String(idJuge))
 
-  const conflitDetecte =
-    date &&
-    heure &&
-    planningJuge.some((a) => a.date_heure === `${date}T${heure}:00`)
-
   async function handleSubmit(e) {
     e.preventDefault()
     setErreur('')
+    setCreneauxLibres([])
     setEnCours(true)
     try {
       const audience = await creerAudience({
@@ -58,8 +56,13 @@ export default function NouvelleAudience() {
         date_heure: `${date} ${heure}:00`,
       })
       navigate(`/greffier/dossiers/${audience.id_dossier ?? idDossier}`)
-    } catch {
-      setErreur("Impossible de programmer l'audience.")
+    } catch (err) {
+      if (err.response?.status === 409) {
+        setErreur(err.response.data.message)
+        setCreneauxLibres(err.response.data.creneaux_libres ?? [])
+      } else {
+        setErreur("Impossible de programmer l'audience.")
+      }
     } finally {
       setEnCours(false)
     }
@@ -147,10 +150,27 @@ export default function NouvelleAudience() {
               </div>
             </div>
 
-            {conflitDetecte && (
-              <p className="bg-gold-100 text-navy-900 text-sm rounded px-3 py-2">
-                ⚠ Ce juge a déjà une audience à ce créneau exact.
-              </p>
+            {creneauxLibres.length > 0 && (
+              <div className="bg-gold-100 rounded px-3 py-2">
+                <p className="text-sm text-navy-900 mb-2">Créneaux libres pour ce juge :</p>
+                <div className="flex flex-wrap gap-2">
+                  {creneauxLibres.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => {
+                        setDate(c.slice(0, 10))
+                        setHeure(c.slice(11, 16))
+                        setCreneauxLibres([])
+                        setErreur('')
+                      }}
+                      className="bg-white border border-slate-200 text-sm rounded px-2.5 py-1 hover:border-navy-700"
+                    >
+                      {new Date(c.replace(' ', 'T')).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })}
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
 
             <button

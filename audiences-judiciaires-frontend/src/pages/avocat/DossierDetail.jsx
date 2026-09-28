@@ -95,7 +95,7 @@ export default function DossierDetailAvocat() {
 
       {audienceLiee && (
         <Link
-          to={`/avocat/audiences/${audienceLiee.id_audience}/rejoindre`}
+          to={`/avocat/salle-attente/${audienceLiee.id_audience}`}
           className="flex items-center gap-2 bg-navy-900 text-white text-sm font-medium rounded px-4 py-2 hover:bg-navy-800 transition-colors w-fit mb-4"
         >
           <Video size={15} />

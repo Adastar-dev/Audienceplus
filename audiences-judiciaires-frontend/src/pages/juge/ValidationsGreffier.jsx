@@ -67,8 +67,20 @@ export default function ValidationsGreffier() {
     try {
       await approuverReport(c.id_convocation, c.nouvelle_date_proposee)
       setConvocations((list) => list.filter((x) => x.id_convocation !== c.id_convocation))
-    } catch {
-      setErreur("Impossible d'approuver ce report.")
+    } catch (err) {
+      // 409 : le juge a déjà une audience au créneau proposé par le greffier.
+      const creneaux = err.response?.data?.creneaux_libres ?? []
+      setErreur(
+        err.response?.status === 409
+          ? `${err.response.data.message}${
+              creneaux.length
+                ? ` Créneaux libres : ${creneaux
+                    .map((d) => new Date(d.replace(' ', 'T')).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }))
+                    .join(', ')}.`
+                : ''
+            }`
+          : "Impossible d'approuver ce report.",
+      )
     } finally {
       setEnCours(false)
     }

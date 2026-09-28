@@ -16,8 +16,13 @@ class ProcesVerbalController extends Controller
     {
     }
 
-    public function show(Audience $audience)
+    public function show(Request $request, Audience $audience)
     {
+        // Le PV n'est lisible que par les personnes qui ont accès au dossier.
+        if (! $audience->dossier->estAccessiblePar($request->user())) {
+            return response()->json(['message' => "Vous n'avez pas accès à ce procès-verbal."], 403);
+        }
+
         $pv = $audience->procesVerbal;
 
         if (! $pv) {
@@ -97,6 +102,10 @@ class ProcesVerbalController extends Controller
     // cela bloque ou modifie la validation par le juge.
     public function donnerAvis(Request $request, Audience $audience)
     {
+        if (! $audience->dossier->estAccessiblePar($request->user())) {
+            return response()->json(['message' => "Ce dossier n'est pas communiqué au ministère public."], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'avis' => 'required|string|max:4000',
         ]);
@@ -138,6 +147,10 @@ class ProcesVerbalController extends Controller
 
         if (! $pv) {
             return response()->json(['message' => 'Aucun PV rédigé pour cette audience.'], 404);
+        }
+
+        if ($audience->dossier?->estArchive()) {
+            return response()->json(['message' => 'Le dossier est archivé : le délai de contestation est écoulé.'], 409);
         }
 
         if ($pv->statut !== 'CLOTURE') {

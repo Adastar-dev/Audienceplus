@@ -59,6 +59,32 @@ services:
       - ./audiences-judiciaires-backend:/var/www/html
       - backend_vendor:/var/www/html/vendor
 
+  # Tâches planifiées de Laravel (routes/console.php) : rappels 48 h et 2 h
+  # avant les audiences, archivage automatique des dossiers jugés.
+  scheduler:
+    build:
+      context: ./audiences-judiciaires-backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - app
+    user: www-data
+    entrypoint: ["php", "artisan", "schedule:work"]
+    command: []
+    environment:
+      APP_ENV: local
+      APP_URL: http://localhost:8000
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: audiences_judiciaires
+      DB_USERNAME: laravel
+      DB_PASSWORD: secret
+      HOME: /tmp
+    volumes:
+      - ./audiences-judiciaires-backend:/var/www/html
+      - backend_vendor:/var/www/html/vendor
+
   nginx:
     image: nginx:alpine
     restart: unless-stopped

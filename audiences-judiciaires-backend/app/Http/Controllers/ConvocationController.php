@@ -3,9 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\Convocation;
+use App\Models\Dossier;
+use App\Models\Utilisateur;
+use App\Services\DisponibiliteJuge;
 use App\Services\NotificationDispatcher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use App\Support\Messages;
+use Illuminate\Support\Carbon;
 
 class ConvocationController extends Controller
 {
@@ -19,6 +24,9 @@ class ConvocationController extends Controller
 
         if (! in_array($request->user()->role, ['GREFFIER', 'JUGE'], true)) {
             $query->where('id_utilisateur', $request->user()->id_utilisateur);
+        } else {
+            // Greffier et juge : seulement les dossiers de leur tribunal.
+            $query->whereHas('audience.dossier', fn ($q) => $q->visiblesPar($request->user()));
         }
 
         return response()->json($query->latest('date_envoi')->get());
@@ -54,6 +62,12 @@ class ConvocationController extends Controller
             'motif_report' => $request->motif_report,
         ]);
 
+        $convocation->loadMissing('audience.dossier');
+        $this->notifications->notifierGreffiers(
+            $convocation->audience->dossier,
+            Messages::demandeReport($convocation->audience, $request->user()->nom, $request->motif_report),
+        );
+
         return response()->json($convocation);
     }
 
@@ -85,13 +99,21 @@ class ConvocationController extends Controller
             'avis_greffier_date' => now(),
         ]);
 
+        $convocation->loadMissing('audience.dossier', 'audience.juge');
+        if ($juge = $convocation->audience->juge) {
+            $this->notifications->envoyerMessage(
+                $juge,
+                Messages::reportADecider($convocation->audience, $request->avis, $request->nouvelle_date_heure),
+            );
+        }
+
         return response()->json($convocation->load('greffierQuiADonneAvis'));
     }
 
     // Décision finale : réservée au juge, et seulement une fois que le
     // greffier a donné son avis. Le juge peut reprendre la date proposée par
     // le greffier ou en fixer une autre.
-    public function approuverReport(Request $request, Convocation $convocation)
+    public function approuverReport(Request $request, Convocation $convocation, DisponibiliteJuge $disponibilite)
     {
         $validator = Validator::make($request->all(), [
             'nouvelle_date_heure' => 'nullable|date',
@@ -114,13 +136,38 @@ class ConvocationController extends Controller
             ], 422);
         }
 
+        $audience = $convocation->audience;
+        if ($audience->id_juge
+            && ! $disponibilite->estDisponible((int) $audience->id_juge, Carbon::parse($nouvelleDate), $audience->id_audience)) {
+            return $disponibilite->reponseIndisponible((int) $audience->id_juge, Carbon::parse($nouvelleDate));
+        }
+
         $convocation->update(['statut' => 'REPORT_APPROUVEE', 'decide_par' => $request->user()->id_utilisateur]);
-        $convocation->audience()->update(['date_heure' => $nouvelleDate]);
-        $this->notifications->envoyerLibre(
-            $convocation->utilisateur,
-            'Report approuvé',
-            'Votre demande de report a été approuvée. Une nouvelle convocation vous parviendra pour la nouvelle date.',
-        );
+        // Nouvelle date : les rappels automatiques repartent de zéro.
+        $convocation->audience()->update(['date_heure' => $nouvelleDate, 'rappel_48h_le' => null, 'rappel_2h_le' => null]);
+        $convocation->load('audience.dossier');
+        $date = Carbon::parse($nouvelleDate);
+        $this->notifications->envoyerMessage($convocation->utilisateur, Messages::reportAccepte($convocation->audience, $date));
+
+        // Les autres parties sont reconvoquées à la nouvelle date (elles
+        // doivent confirmer à nouveau) ; le juge et le procureur sont prévenus.
+        $autres = Convocation::with('utilisateur')
+            ->where('id_audience', $convocation->id_audience)
+            ->where('id_convocation', '!=', $convocation->id_convocation)
+            ->get();
+        foreach ($autres as $autre) {
+            $autre->update(['statut' => 'ENVOYEE', 'date_envoi' => now()]);
+            $this->notifications->envoyerMessage($autre->utilisateur, Messages::audienceReportee($convocation->audience, $date, true));
+        }
+
+        $dossier = $convocation->audience->dossier;
+        $magistrats = array_filter([
+            $convocation->audience->id_juge,
+            Dossier::communiqueAuParquet($dossier->type) ? $dossier->id_procureur : null,
+        ]);
+        foreach (Utilisateur::whereIn('id_utilisateur', $magistrats)->get() as $magistrat) {
+            $this->notifications->envoyerMessage($magistrat, Messages::audienceReportee($convocation->audience, $date, false));
+        }
 
         return response()->json($convocation->load('audience'));
     }
@@ -146,10 +193,10 @@ class ConvocationController extends Controller
             'reponse_greffier' => $request->reponse_greffier,
             'decide_par' => $request->user()->id_utilisateur,
         ]);
-        $this->notifications->envoyerLibre(
+        $convocation->loadMissing('audience.dossier');
+        $this->notifications->envoyerMessage(
             $convocation->utilisateur,
-            'Report refusé',
-            "Votre demande de report a été refusée : {$request->reponse_greffier}",
+            Messages::reportRefuse($convocation->audience, $request->reponse_greffier),
         );
 
         return response()->json($convocation);

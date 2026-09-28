@@ -33,6 +33,10 @@ class PieceController extends Controller
             abort(403, "Vous n'avez pas accès à ce dossier.");
         }
 
+        if ($dossier->estArchive()) {
+            return response()->json(['message' => 'Ce dossier est archivé : il ne peut plus être modifié.'], 409);
+        }
+
         $validator = Validator::make($request->all(), [
             'fichier' => [
                 'required',

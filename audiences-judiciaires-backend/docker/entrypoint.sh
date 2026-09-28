@@ -20,7 +20,11 @@ until php -r "new PDO('mysql:host='.getenv('DB_HOST').';port='.getenv('DB_PORT')
 done
 echo "Base de données prête."
 
-php artisan key:generate --force
+# Clé générée une seule fois : la régénérer à chaque démarrage rendrait
+# illisibles les données chiffrées et invalides les empreintes des décisions.
+if ! grep -q "^APP_KEY=base64:" .env; then
+  php artisan key:generate --force
+fi
 php artisan migrate --force
 
 exec "$@"

@@ -84,7 +84,7 @@ export default function JusticiableDashboard() {
             <ConvocationStatusBadge statut={convocation.statut} />
           </div>
 
-          {(convocation.statut === StatutConvocation.ENVOYEE || convocation.statut === StatutConvocation.RECUE) &&
+          {convocation.statut === StatutConvocation.ENVOYEE &&
             !showReportForm && (
               <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
                 <button

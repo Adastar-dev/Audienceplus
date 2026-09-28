@@ -10,6 +10,9 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
+    // Adresse de l'interface React, citée dans les emails envoyés aux utilisateurs.
+    'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
+
     'timezone' => 'UTC',
 
     'locale' => env('APP_LOCALE', 'en'),

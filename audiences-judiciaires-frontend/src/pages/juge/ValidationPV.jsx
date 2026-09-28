@@ -50,7 +50,7 @@ export default function ValidationPV() {
       })
       setSignatures(sigs)
     } catch {
-      setErreur('Impossible de valider/signer le PV.')
+      setErreur('Impossible de valider et sceller le PV.')
     } finally {
       setEnCours(false)
     }
@@ -179,7 +179,7 @@ export default function ValidationPV() {
                 className="flex items-center gap-2 bg-gold-600 text-white text-sm font-medium rounded px-4 py-2 hover:opacity-90 disabled:opacity-60 transition-opacity"
               >
                 <PenLine size={15} />
-                {enCours ? 'Signature...' : 'Valider et signer électroniquement'}
+                {enCours ? 'Scellement...' : 'Valider et sceller le PV'}
               </button>
               <button
                 onClick={() => setShowRejet(true)}

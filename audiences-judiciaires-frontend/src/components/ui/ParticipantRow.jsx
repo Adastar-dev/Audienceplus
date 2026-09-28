@@ -2,9 +2,10 @@ import { Mic, MicOff, Video, VideoOff, CircleUserRound, UserCheck, UserX } from 
 import { ROLE_LABELS } from '../../constants/enums'
 
 export default function ParticipantRow({ participant, onToggleMicro, onToggleCamera, onAdmettre, onRefuser }) {
-  const { nom, role, micro_actif, camera_active, present, admis } = participant
+  const { nom, role, micro_actif, camera_active, present, admis, identite_confirmee_otp } = participant
 
-  if (present && !admis) {
+  // En salle d'attente : code confirmé, pas encore admis (par le juge ou le greffier).
+  if (identite_confirmee_otp && !admis && ['JUSTICIABLE', 'AVOCAT', 'PROCUREUR'].includes(role)) {
     return (
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-navy-700 last:border-0 bg-navy-800/50">
         <div className="flex items-center gap-2.5 min-w-0">

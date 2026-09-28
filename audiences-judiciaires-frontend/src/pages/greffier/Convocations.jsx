@@ -6,8 +6,6 @@ import { StatutConvocation, CanalNotification } from '../../constants/enums'
 
 const LIBELLE_CANAL = {
   [CanalNotification.EMAIL]: 'Email',
-  [CanalNotification.SMS]: 'SMS',
-  [CanalNotification.APPEL_VOCAL]: 'Appel vocal',
   [CanalNotification.IN_APP]: 'In-app',
 }
 
@@ -116,7 +114,7 @@ export default function Convocations() {
                       onClick={() => handleRelancer(c.id_convocation)}
                       disabled={enCours}
                       className="text-xs text-navy-900 font-medium hover:underline disabled:opacity-40"
-                      title="Renvoyer la notification (SMS ou email)"
+                      title="Renvoyer la convocation par email"
                     >
                       Relancer
                     </button>

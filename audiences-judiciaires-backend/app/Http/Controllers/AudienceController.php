@@ -4,13 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Models\Audience;
 use App\Models\Convocation;
+use App\Models\Dossier;
 use App\Models\ParticipationAudience;
 use App\Models\SalleVirtuelle;
 use App\Models\Utilisateur;
+use App\Services\DisponibiliteJuge;
 use App\Services\JitsiTokenService;
 use App\Services\NotificationDispatcher;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Validator;
+use App\Support\Messages;
 
 class AudienceController extends Controller
 {
@@ -20,17 +24,24 @@ class AudienceController extends Controller
 
     public function index(Request $request)
     {
-        $query = Audience::with(['dossier', 'juge', 'procesVerbal']);
+        $utilisateur = $request->user();
+        // Chacun ne voit que les audiences des dossiers auxquels il a accès.
+        $query = Audience::with(['dossier', 'juge', 'procesVerbal'])
+            ->whereHas('dossier', fn ($q) => $q->visiblesPar($utilisateur));
 
-        if ($request->user()->role === 'JUGE') {
-            $query->where('id_juge', $request->user()->id_utilisateur);
+        if ($utilisateur->role === 'JUGE') {
+            $query->where('id_juge', $utilisateur->id_utilisateur);
         }
 
         return response()->json($query->orderBy('date_heure')->get());
     }
 
-    public function show(Audience $audience)
+    public function show(Request $request, Audience $audience)
     {
+        if (! $audience->dossier->estAccessiblePar($request->user())) {
+            return response()->json(['message' => "Vous n'avez pas accès à cette audience."], 403);
+        }
+
         $audience->refresh();
 
         return response()->json($audience->load([
@@ -39,7 +50,7 @@ class AudienceController extends Controller
         ]));
     }
 
-    public function store(Request $request)
+    public function store(Request $request, DisponibiliteJuge $disponibilite)
     {
         $validator = Validator::make($request->all(), [
             'id_dossier' => 'required|exists:dossiers,id_dossier',
@@ -54,6 +65,15 @@ class AudienceController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
+        if (Dossier::find($request->id_dossier)->estArchive()) {
+            return response()->json(['message' => 'Ce dossier est archivé : aucune audience ne peut y être programmée.'], 409);
+        }
+
+        $dateHeure = Carbon::parse($request->date_heure);
+        if ($request->id_juge && ! $disponibilite->estDisponible((int) $request->id_juge, $dateHeure)) {
+            return $disponibilite->reponseIndisponible((int) $request->id_juge, $dateHeure);
+        }
+
         $audience = Audience::create([
             'id_dossier' => $request->id_dossier,
             'id_juge' => $request->id_juge,
@@ -63,8 +83,21 @@ class AudienceController extends Controller
         ]);
 
         $this->convoquerParties($audience);
+        $this->prevenirJugeEtProcureur($audience);
 
         return response()->json($audience->load('dossier'), 201);
+    }
+
+    private function prevenirJugeEtProcureur(Audience $audience): void
+    {
+        $audience->loadMissing('dossier');
+        $message = Messages::audienceProgrammee($audience);
+
+        foreach (array_filter([$audience->id_juge, $audience->dossier->id_procureur]) as $idDestinataire) {
+            if ($destinataire = Utilisateur::find($idDestinataire)) {
+                $this->notifications->envoyerMessage($destinataire, $message);
+            }
+        }
     }
 
     private function convoquerParties(Audience $audience): void
@@ -75,18 +108,13 @@ class AudienceController extends Controller
             $convocation = Convocation::create([
                 'id_audience' => $audience->id_audience,
                 'id_utilisateur' => $utilisateur->id_utilisateur,
-                'canal' => $this->canalPrefere($utilisateur),
+                'canal' => 'EMAIL',
                 'statut' => 'ENVOYEE',
                 'date_envoi' => now(),
             ]);
 
             $this->notifications->envoyerConvocation($convocation);
         }
-    }
-
-    private function canalPrefere(Utilisateur $utilisateur): string
-    {
-        return $utilisateur->telephone ? 'SMS' : 'EMAIL';
     }
 
     public function ouvrir(Audience $audience)
@@ -153,19 +181,25 @@ class AudienceController extends Controller
                 return response()->json(['message' => "Le juge n'a pas encore ouvert la salle."], 409);
             }
 
-            // Le code OTP de la salle d'attente est aussi exigé ici, et pas
-            // seulement par l'interface : sinon un appel direct à l'API
-            // permettrait d'entrer sans vérification d'identité.
-            if ($utilisateur->role === 'JUSTICIABLE') {
-                $identiteConfirmee = ParticipationAudience::where('id_audience', $audience->id_audience)
+            // Justiciable, avocat et procureur : code OTP confirmé dans la salle
+            // d'attente, puis admission par le greffier ou le juge. Contrôlé ici,
+            // et pas seulement par l'interface. Le greffier n'y est pas soumis.
+            if (in_array($utilisateur->role, ['JUSTICIABLE', 'AVOCAT', 'PROCUREUR'], true)) {
+                $participation = ParticipationAudience::where('id_audience', $audience->id_audience)
                     ->where('id_utilisateur', $utilisateur->id_utilisateur)
-                    ->where('identite_confirmee_otp', true)
-                    ->exists();
+                    ->first();
 
-                if (! $identiteConfirmee) {
+                if (! $participation || ! $participation->identite_confirmee_otp) {
                     return response()->json([
-                        'message' => "Confirmez d'abord votre identité avec le code reçu par SMS, dans la salle d'attente.",
+                        'message' => "Confirmez d'abord votre identité avec le code de vérification, dans la salle d'attente.",
                     ], 403);
+                }
+
+                if (! $participation->admis) {
+                    return response()->json([
+                        'message' => "Vous êtes dans la salle d'attente : le greffier ou le juge va vous faire entrer.",
+                        'en_attente_admission' => true,
+                    ], 409);
                 }
             }
         }
@@ -206,11 +240,25 @@ class AudienceController extends Controller
 
     public function fermer(Audience $audience)
     {
+        $audience->refresh();
+
+        if ($audience->statut !== 'EN_COURS') {
+            return response()->json(['message' => "Seule une audience en cours peut être fermée."], 409);
+        }
+
+        // Une audience ne se ferme pas sans décision : sinon le dossier reste
+        // sans issue et aucune décision n'est communiquée aux parties.
+        if (! $audience->type_decision) {
+            return response()->json([
+                'message' => "Enregistrez d'abord la décision (jugement, renvoi ou mise en délibéré) avant de fermer l'audience.",
+            ], 422);
+        }
+
         $audience->update(['statut' => 'CLOTUREE', 'juge_connecte' => false]);
 
         if ($audience->type_decision === 'JUGEMENT') {
             $audience->dossier()->update(['statut' => 'JUGE']);
-            $this->notifierDecision($audience, 'Le jugement a été rendu. La décision est disponible.');
+            $this->notifierDecision($audience, 'JUGEMENT');
         }
 
         return response()->json($audience->load('dossier'));
@@ -248,25 +296,30 @@ class AudienceController extends Controller
         $audience->save();
 
         if ($request->type === 'RENVOI') {
-            $this->notifierDecision($audience, "L'audience a été renvoyée à une date ultérieure.");
+            $this->notifierDecision($audience, 'RENVOI');
         } elseif ($request->type === 'DELIBERE') {
-            $this->notifierDecision($audience, 'Le jugement a été mis en délibéré. La décision sera communiquée ultérieurement.');
+            $this->notifierDecision($audience, 'DELIBERE');
         }
 
         return response()->json($audience->load('dossier'));
     }
 
-    private function notifierDecision(Audience $audience, string $message): void
+    private function notifierDecision(Audience $audience, string $typeDecision): void
     {
         $audience->loadMissing('dossier');
+        $message = Messages::decision($audience, $typeDecision);
 
         foreach ($audience->dossier->utilisateursAConvoquer() as $utilisateur) {
-            $this->notifications->envoyerLibre($utilisateur, 'Décision', $message);
+            $this->notifications->envoyerMessage($utilisateur, $message);
         }
     }
 
     public function admettreParticipant(Request $request, Audience $audience, ParticipationAudience $participation)
     {
+        if ((int) $participation->id_audience !== (int) $audience->id_audience) {
+            abort(404);
+        }
+
         $participation->update(['admis' => true]);
 
         return response()->json($participation);
@@ -274,7 +327,13 @@ class AudienceController extends Controller
 
     public function refuserParticipant(Request $request, Audience $audience, ParticipationAudience $participation)
     {
-        $participation->update(['admis' => false, 'present' => false]);
+        if ((int) $participation->id_audience !== (int) $audience->id_audience) {
+            abort(404);
+        }
+
+        // Refus : la personne sort de la salle d'attente et devra refaire la
+        // vérification par code pour se représenter.
+        $participation->update(['admis' => false, 'present' => false, 'identite_confirmee_otp' => false]);
 
         return response()->json($participation);
     }

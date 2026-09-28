@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Bell, Check, Loader2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Bell, Check, ChevronRight, Loader2 } from 'lucide-react'
 import { listerNotifications, accuserReceptionNotification } from '../../services/api/notifications'
 
 export default function Notifications() {
@@ -44,6 +45,11 @@ export default function Notifications() {
                 <div>
                   <p className="text-sm font-medium text-navy-900">{n.type}</p>
                   <p className="text-sm text-slate-600">{n.message}</p>
+                  {n.lien && (
+                    <Link to={n.lien} className="inline-flex items-center gap-0.5 text-sm text-navy-900 font-medium hover:underline mt-1">
+                      Compléter maintenant <ChevronRight size={14} />
+                    </Link>
+                  )}
                   <p className="text-xs text-slate-400 mt-1">
                     {new Date(n.date_envoi).toLocaleString('fr-FR')}
                   </p>

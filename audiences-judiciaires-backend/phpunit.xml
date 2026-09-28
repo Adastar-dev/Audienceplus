@@ -31,6 +31,11 @@
         <server name="DB_CONNECTION" value="sqlite" force="true"/>
         <server name="DB_DATABASE" value=":memory:" force="true"/>
         <server name="DB_URL" value="" force="true"/>
+        <!-- Jamais les vraies clés pendant les tests : pas de
+             consommation du quota du fournisseur d IA (voir aussi Http::preventStrayRequests
+             dans tests/TestCase.php). -->
+        <env name="IA_API_KEY" value="" force="true"/>
+        <server name="IA_API_KEY" value="" force="true"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

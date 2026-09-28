@@ -20,7 +20,10 @@ class NotificationController extends Controller
             return response()->json(['message' => "Cette notification ne vous appartient pas."], 403);
         }
 
-        $notification->update(['lu' => true]);
+        $notification->update([
+            'lu' => true,
+            'date_accuse_reception' => $notification->date_accuse_reception ?? now(),
+        ]);
 
         return response()->json($notification);
     }

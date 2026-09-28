@@ -52,6 +52,12 @@ export function AuthProvider({ children }) {
     return data.user
   }
 
+  // Après un changement côté serveur (ex. photo de CNI déposée).
+  function mettreAJourUtilisateur(userData) {
+    localStorage.setItem(USER_KEY, JSON.stringify(userData))
+    setUser(userData)
+  }
+
   async function logout() {
     try {
       await authApi.logout()
@@ -71,6 +77,7 @@ export function AuthProvider({ children }) {
     login,
     register,
     logout,
+    mettreAJourUtilisateur,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
