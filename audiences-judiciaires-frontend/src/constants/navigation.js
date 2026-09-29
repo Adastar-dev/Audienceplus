@@ -26,6 +26,7 @@ export const NAV_BY_ROLE = {
     { label: 'Tableau de bord', to: '/avocat' },
     { label: 'Mes dossiers', to: '/avocat/dossiers' },
     { label: 'Convocations', to: '/avocat/convocations' },
+    { label: 'Assister à distance', to: '/avocat/demande-distance' },
     { label: 'Historique des audiences', to: '/avocat/historique' },
     { label: 'Messagerie', to: '/avocat/messagerie' },
     { label: 'Notifications', to: '/avocat/notifications' },

@@ -174,6 +174,7 @@ class NouvellesFonctionnalitesTest extends TestCase
         Http::fake();
         $justiciable = $this->creerUtilisateur('JUSTICIABLE', ['telephone' => '+221781705348']);
         $audience = $this->audienceDeTest();
+        $this->lierPartie($audience->dossier, $justiciable);
 
         $this->actingAs($justiciable, 'sanctum')
             ->postJson("/api/audiences/{$audience->id_audience}/verification-identite/otp/envoyer")
@@ -196,6 +197,7 @@ class NouvellesFonctionnalitesTest extends TestCase
         Http::fake();
         $justiciable = $this->creerUtilisateur('JUSTICIABLE', ['telephone' => '+221781705348']);
         $audience = $this->audienceDeTest();
+        $this->lierPartie($audience->dossier, $justiciable);
 
         $this->actingAs($justiciable, 'sanctum')
             ->postJson("/api/audiences/{$audience->id_audience}/verification-identite/otp/envoyer");
@@ -210,6 +212,7 @@ class NouvellesFonctionnalitesTest extends TestCase
         Http::fake();
         $justiciable = $this->creerUtilisateur('JUSTICIABLE', ['email' => null, 'telephone' => '+221781705348']);
         $audience = $this->audienceDeTest();
+        $this->lierPartie($audience->dossier, $justiciable);
 
         $this->actingAs($justiciable, 'sanctum')
             ->postJson("/api/audiences/{$audience->id_audience}/verification-identite/otp/envoyer")
@@ -223,6 +226,7 @@ class NouvellesFonctionnalitesTest extends TestCase
         Http::fake();
         $justiciable = $this->creerUtilisateur('JUSTICIABLE', ['telephone' => '+221781705348']);
         $audience = $this->audienceDeTest();
+        $this->lierPartie($audience->dossier, $justiciable);
 
         $this->actingAs($justiciable, 'sanctum')
             ->postJson("/api/audiences/{$audience->id_audience}/verification-identite/otp/envoyer");
@@ -243,6 +247,7 @@ class NouvellesFonctionnalitesTest extends TestCase
         Http::fake();
         $justiciable = $this->creerUtilisateur('JUSTICIABLE', ['telephone' => '+221781705348']);
         $audience = $this->audienceDeTest(['date_heure' => now()->addHour(), 'statut' => 'PROGRAMMEE']);
+        $this->lierPartie($audience->dossier, $justiciable);
 
         $this->actingAs($justiciable, 'sanctum')
             ->postJson("/api/audiences/{$audience->id_audience}/verification-identite/otp/envoyer")
@@ -256,6 +261,7 @@ class NouvellesFonctionnalitesTest extends TestCase
         Http::fake();
         $justiciable = $this->creerUtilisateur('JUSTICIABLE', ['telephone' => '+221781705348']);
         $audience = $this->audienceDeTest(['date_heure' => now()->addMinutes(20), 'statut' => 'PROGRAMMEE']);
+        $this->lierPartie($audience->dossier, $justiciable);
 
         $this->actingAs($justiciable, 'sanctum')
             ->postJson("/api/audiences/{$audience->id_audience}/verification-identite/otp/envoyer")
@@ -267,6 +273,7 @@ class NouvellesFonctionnalitesTest extends TestCase
         Http::fake();
         $justiciable = $this->creerUtilisateur('JUSTICIABLE', ['telephone' => '+221781705348']);
         $audience = $this->audienceDeTest(['date_heure' => now()->subHour(), 'statut' => 'CLOTUREE']);
+        $this->lierPartie($audience->dossier, $justiciable);
 
         $this->actingAs($justiciable, 'sanctum')
             ->postJson("/api/audiences/{$audience->id_audience}/verification-identite/otp/envoyer")
@@ -282,6 +289,7 @@ class NouvellesFonctionnalitesTest extends TestCase
         // EN_COURS depuis longtemps : pas de statut terminal, donc toujours accessible
         // meme des heures apres l'heure programmee.
         $audience = $this->audienceDeTest(['date_heure' => now()->subHours(3), 'statut' => 'EN_COURS']);
+        $this->lierPartie($audience->dossier, $justiciable);
 
         $this->actingAs($justiciable, 'sanctum')
             ->postJson("/api/audiences/{$audience->id_audience}/verification-identite/otp/envoyer")

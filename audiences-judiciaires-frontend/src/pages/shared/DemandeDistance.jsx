@@ -6,7 +6,8 @@ import {
   listerDemandesDistance,
   creerDemandeDistance,
 } from '../../services/api/demandesDistance'
-import { ModeAudience, StatutDemandeDistance, STATUT_DEMANDE_DISTANCE_LABELS } from '../../constants/enums'
+import { ModeAudience, StatutAudience, StatutDemandeDistance, STATUT_DEMANDE_DISTANCE_LABELS } from '../../constants/enums'
+import { useAuth } from '../../context/AuthContext'
 import Badge from '../../components/ui/Badge'
 
 const TONE_PAR_STATUT = {
@@ -15,7 +16,11 @@ const TONE_PAR_STATUT = {
   [StatutDemandeDistance.REFUSEE]: 'danger',
 }
 
+// Page commune au justiciable et à l'avocat : demande de comparution à
+// distance pour une audience prévue en présentiel.
 export default function DemandeDistance() {
+  const { user } = useAuth()
+  const espace = user?.role === 'AVOCAT' ? 'avocat' : 'justiciable'
   const [convocations, setConvocations] = useState([])
   const [demandes, setDemandes] = useState([])
   const [chargement, setChargement] = useState(true)
@@ -64,7 +69,12 @@ export default function DemandeDistance() {
 
   const audiencesPresentielles = convocations
     .map((c) => c.audience)
-    .filter((a) => a && a.mode === ModeAudience.PRESENTIEL)
+    .filter(
+      (a) =>
+        a &&
+        a.mode === ModeAudience.PRESENTIEL &&
+        [StatutAudience.PROGRAMMEE, StatutAudience.EN_COURS].includes(a.statut),
+    )
 
   return (
     <div>
@@ -106,7 +116,7 @@ export default function DemandeDistance() {
 
               {demande?.statut === StatutDemandeDistance.APPROUVEE && (
                 <Link
-                  to={`/justiciable/salle-attente/${a.id_audience}`}
+                  to={`/${espace}/salle-attente/${a.id_audience}`}
                   className="inline-flex items-center gap-1.5 mt-3 text-xs text-navy-900 font-medium hover:underline"
                 >
                   Rejoindre l'audience à distance →

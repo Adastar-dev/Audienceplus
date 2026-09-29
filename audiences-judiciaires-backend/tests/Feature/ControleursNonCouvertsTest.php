@@ -153,6 +153,7 @@ class ControleursNonCouvertsTest extends TestCase
             'id_dossier' => $dossier->id_dossier, 'date_heure' => now()->addDays(3),
             'mode' => 'PRESENTIEL', 'statut' => 'PROGRAMMEE',
         ]);
+        $this->lierPartie($dossier, $justiciable);
 
         $reponse = $this->actingAs($justiciable, 'sanctum')->postJson('/api/demandes-distance', [
             'id_audience' => $audience->id_audience, 'motif' => 'Je réside à l\'étranger.',
@@ -160,6 +161,29 @@ class ControleursNonCouvertsTest extends TestCase
 
         $reponse->assertStatus(201);
         $this->assertEquals('EN_ATTENTE', $reponse->json('statut'));
+    }
+
+    public function test_lavocat_du_dossier_peut_demander_a_distance_mais_pas_un_etranger_au_dossier(): void
+    {
+        $avocat = $this->creerUtilisateur('AVOCAT');
+        $etranger = $this->creerUtilisateur('JUSTICIABLE');
+        $dossier = Dossier::create([
+            'numero' => 'TRB-TEST-'.uniqid(), 'type' => 'DIVORCE', 'statut' => 'EN_COURS',
+            'parties' => 'X c. Y', 'id_tribunal' => $this->tribunal()->id_tribunal, 'date_creation' => now(),
+        ]);
+        $audience = Audience::create([
+            'id_dossier' => $dossier->id_dossier, 'date_heure' => now()->addDays(3),
+            'mode' => 'PRESENTIEL', 'statut' => 'PROGRAMMEE',
+        ]);
+        $this->lierPartie($dossier, $avocat);
+
+        $this->actingAs($avocat, 'sanctum')->postJson('/api/demandes-distance', [
+            'id_audience' => $audience->id_audience, 'motif' => 'Plaidoirie le même jour à Saint-Louis.',
+        ])->assertStatus(201);
+
+        $this->actingAs($etranger, 'sanctum')->postJson('/api/demandes-distance', [
+            'id_audience' => $audience->id_audience, 'motif' => 'Test.',
+        ])->assertStatus(403);
     }
 
     public function test_on_ne_peut_pas_demander_a_distance_pour_une_audience_deja_en_ligne(): void
@@ -174,6 +198,7 @@ class ControleursNonCouvertsTest extends TestCase
             'id_dossier' => $dossier->id_dossier, 'date_heure' => now()->addDays(3),
             'mode' => 'EN_LIGNE', 'statut' => 'PROGRAMMEE',
         ]);
+        $this->lierPartie($dossier, $justiciable);
 
         $reponse = $this->actingAs($justiciable, 'sanctum')->postJson('/api/demandes-distance', [
             'id_audience' => $audience->id_audience, 'motif' => 'Test.',

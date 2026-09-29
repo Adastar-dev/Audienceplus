@@ -14,6 +14,7 @@ export default function DossierDetailAvocat() {
   const [dossier, setDossier] = useState(null)
   const [pieces, setPieces] = useState([])
   const [audienceLiee, setAudienceLiee] = useState(null)
+  const [audienceADistance, setAudienceADistance] = useState(null)
   const [convocationLiee, setConvocationLiee] = useState(null)
   const [chargement, setChargement] = useState(true)
   const [erreur, setErreur] = useState('')
@@ -29,6 +30,13 @@ export default function DossierDetailAvocat() {
         setPieces(p)
         const aud = audiences.find((a) => a.id_dossier === Number(id))
         setAudienceLiee(aud ?? null)
+        // Audience à rejoindre : à venir ou en cours, avec une salle virtuelle
+        // (audience en ligne ou comparution à distance accordée).
+        setAudienceADistance(
+          audiences
+            .filter((a) => a.id_dossier === Number(id) && a.salle_virtuelle && ['PROGRAMMEE', 'EN_COURS'].includes(a.statut))
+            .sort((a, b) => a.date_heure.localeCompare(b.date_heure))[0] ?? null,
+        )
         if (aud) {
           setConvocationLiee(convocations.find((c) => c.id_audience === aud.id_audience) ?? null)
         }
@@ -93,9 +101,9 @@ export default function DossierDetailAvocat() {
         <DossierStatusBadge statut={dossier.statut} />
       </div>
 
-      {audienceLiee && (
+      {audienceADistance && (
         <Link
-          to={`/avocat/salle-attente/${audienceLiee.id_audience}`}
+          to={`/avocat/salle-attente/${audienceADistance.id_audience}`}
           className="flex items-center gap-2 bg-navy-900 text-white text-sm font-medium rounded px-4 py-2 hover:bg-navy-800 transition-colors w-fit mb-4"
         >
           <Video size={15} />

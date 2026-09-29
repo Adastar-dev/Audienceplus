@@ -44,7 +44,7 @@ import JusticiableDashboard from '../pages/justiciable/Dashboard'
 import MonDossier from '../pages/justiciable/MonDossier'
 import Decisions from '../pages/justiciable/Decisions'
 import CasierJudiciaire from '../pages/justiciable/CasierJudiciaire'
-import DemandeDistance from '../pages/justiciable/DemandeDistance'
+import DemandeDistance from '../pages/shared/DemandeDistance'
 import Notifications from '../pages/justiciable/Notifications'
 import SalleAttente from '../pages/shared/SalleAttente'
 import MonCompte from '../pages/shared/MonCompte'
@@ -139,6 +139,7 @@ export default function AppRoutes() {
           <Route path="/avocat/dossiers" element={<DossiersAvocat />} />
           <Route path="/avocat/dossiers/:id" element={<DossierDetailAvocat />} />
           <Route path="/avocat/convocations" element={<ConvocationsAvocat />} />
+          <Route path="/avocat/demande-distance" element={<DemandeDistance />} />
           <Route path="/avocat/historique" element={<HistoriqueAudiences />} />
           <Route path="/avocat/messagerie" element={<Messagerie />} />
           <Route path="/avocat/notifications" element={<Notifications />} />

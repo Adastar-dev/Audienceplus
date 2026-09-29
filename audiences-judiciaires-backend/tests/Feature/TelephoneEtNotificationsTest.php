@@ -159,9 +159,10 @@ class TelephoneEtNotificationsTest extends TestCase
     public function test_le_greffier_puis_le_juge_sont_prevenus_dune_demande_a_distance(): void
     {
         Mail::fake();
-        [, $audience, $juge] = $this->dossierAvecAudience();
+        [$dossier, $audience, $juge] = $this->dossierAvecAudience();
         $greffier = $this->creerUtilisateur('GREFFIER');
         $justiciable = $this->creerUtilisateur('JUSTICIABLE');
+        $this->lierPartie($dossier, $justiciable);
 
         $this->actingAs($justiciable, 'sanctum')
             ->postJson('/api/demandes-distance', ['id_audience' => $audience->id_audience, 'motif' => 'Réside à Paris'])

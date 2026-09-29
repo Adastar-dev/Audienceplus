@@ -109,6 +109,15 @@ class ParticipationController extends Controller
             return $refus;
         }
 
+        // Avant tout envoi : partie au dossier, compte vérifié et comparution à
+        // distance accordée (voir Audience::peutEtreRejointeADistancePar).
+        if (in_array($request->user()->role, ['JUSTICIABLE', 'AVOCAT', 'PROCUREUR'], true)
+            && ! $audience->peutEtreRejointeADistancePar($request->user())) {
+            return response()->json([
+                'message' => "Aucune comparution à distance ne vous a été accordée pour cette audience.",
+            ], 403);
+        }
+
         $participation = ParticipationAudience::firstOrCreate(
             ['id_audience' => $audience->id_audience, 'id_utilisateur' => $request->user()->id_utilisateur],
             ['role_audience' => $request->user()->role]

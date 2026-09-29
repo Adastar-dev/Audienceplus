@@ -110,6 +110,7 @@ class ProcureurEtPiecesTest extends TestCase
             'id_dossier' => $dossier->id_dossier, 'date_heure' => now()->subDays(2),
             'mode' => 'PRESENTIEL', 'statut' => 'RATEE',
         ]);
+        $this->lierPartie($dossier, $justiciable);
 
         $this->actingAs($justiciable, 'sanctum')->postJson('/api/demandes-distance', [
             'id_audience' => $audience->id_audience, 'motif' => 'Test',
@@ -124,6 +125,7 @@ class ProcureurEtPiecesTest extends TestCase
             'id_dossier' => $dossier->id_dossier, 'date_heure' => now()->subDays(2),
             'mode' => 'PRESENTIEL', 'statut' => 'CLOTUREE',
         ]);
+        $this->lierPartie($dossier, $justiciable);
 
         $this->actingAs($justiciable, 'sanctum')->postJson('/api/demandes-distance', [
             'id_audience' => $audience->id_audience, 'motif' => 'Test',
@@ -138,6 +140,7 @@ class ProcureurEtPiecesTest extends TestCase
             'id_dossier' => $dossier->id_dossier, 'date_heure' => now()->addDays(3),
             'mode' => 'PRESENTIEL', 'statut' => 'PROGRAMMEE',
         ]);
+        $this->lierPartie($dossier, $justiciable);
 
         $this->actingAs($justiciable, 'sanctum')->postJson('/api/demandes-distance', [
             'id_audience' => $audience->id_audience, 'motif' => 'Test',

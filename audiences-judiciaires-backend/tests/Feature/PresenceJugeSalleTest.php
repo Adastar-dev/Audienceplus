@@ -326,4 +326,31 @@ class PresenceJugeSalleTest extends TestCase
         $this->actingAs($juge, 'sanctum')->getJson("/api/audiences/{$audience->id_audience}/jitsi-jeton")
             ->assertOk()->assertJsonPath('moderateur', true);
     }
+
+    public function test_seule_la_partie_dont_la_demande_est_approuvee_rejoint_une_audience_en_presentiel(): void
+    {
+        config(['services.jitsi.app_secret' => 'secret-de-test']);
+        $audience = $this->audienceDeTest(['mode' => 'PRESENTIEL', 'juge_connecte' => true]);
+        $aDistance = $this->creerUtilisateur('JUSTICIABLE');
+        $auTribunal = $this->creerUtilisateur('JUSTICIABLE');
+        $this->lierPartie($audience->dossier, $aDistance);
+        $this->lierPartie($audience->dossier, $auTribunal, 'DEFENDEUR');
+        DemandeDistance::create([
+            'id_audience' => $audience->id_audience, 'id_utilisateur' => $aDistance->id_utilisateur,
+            'motif' => 'Réside à Paris', 'statut' => 'APPROUVEE', 'date_demande' => now(),
+        ]);
+
+        // L'autre partie, attendue au tribunal, ne reçoit ni code ni jeton.
+        $this->actingAs($auTribunal, 'sanctum')
+            ->postJson("/api/audiences/{$audience->id_audience}/verification-identite/otp/envoyer")
+            ->assertStatus(403);
+        $this->actingAs($auTribunal, 'sanctum')
+            ->getJson("/api/audiences/{$audience->id_audience}/jitsi-jeton")
+            ->assertStatus(403);
+
+        // La partie autorisée reçoit bien son code.
+        $this->actingAs($aDistance, 'sanctum')
+            ->postJson("/api/audiences/{$audience->id_audience}/verification-identite/otp/envoyer")
+            ->assertOk();
+    }
 }

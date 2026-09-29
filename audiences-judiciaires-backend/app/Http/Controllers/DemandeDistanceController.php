@@ -41,6 +41,10 @@ class DemandeDistanceController extends Controller
         }
 
         $audience = Audience::findOrFail($request->id_audience);
+        // Seul un justiciable ou un avocat partie au dossier (compte vérifié) peut demander.
+        if (! $audience->dossier->estAccessiblePar($request->user())) {
+            return response()->json(['message' => "Vous n'êtes pas partie à ce dossier."], 403);
+        }
         if ($audience->mode === 'EN_LIGNE') {
             return response()->json(['message' => 'Cette audience est déjà prévue en ligne.'], 422);
         }

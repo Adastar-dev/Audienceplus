@@ -47,6 +47,14 @@ abstract class TestCase extends BaseTestCase
         ], $overrides));
     }
 
+    // Rattache un compte comme partie (demandeur par défaut) à un dossier.
+    protected function lierPartie($dossier, Utilisateur $utilisateur, string $role = 'DEMANDEUR'): void
+    {
+        \App\Models\PartieDossier::create([
+            'id_dossier' => $dossier->id_dossier, 'id_utilisateur' => $utilisateur->id_utilisateur, 'role_partie' => $role,
+        ]);
+    }
+
     protected function creerUtilisateur(string $role, array $overrides = []): Utilisateur
     {
         static $compteur = 0;

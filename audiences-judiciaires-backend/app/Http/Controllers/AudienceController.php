@@ -95,7 +95,10 @@ class AudienceController extends Controller
         $audience->loadMissing('dossier');
         $message = Messages::audienceProgrammee($audience);
 
-        foreach (array_filter([$audience->id_juge, $audience->dossier->id_procureur]) as $idDestinataire) {
+        // Le procureur n'est prévenu que pour un dossier communiqué au ministère public.
+        $procureur = Dossier::communiqueAuParquet($audience->dossier->type) ? $audience->dossier->id_procureur : null;
+
+        foreach (array_filter([$audience->id_juge, $procureur]) as $idDestinataire) {
             if ($destinataire = Utilisateur::find($idDestinataire)) {
                 $this->notifications->envoyerMessage($destinataire, $message);
             }
@@ -175,9 +178,15 @@ class AudienceController extends Controller
         $estJuge = $utilisateur->role === 'JUGE'
             && (! $audience->id_juge || (int) $audience->id_juge === (int) $utilisateur->id_utilisateur);
 
+        $participantDistant = in_array($utilisateur->role, ['JUSTICIABLE', 'AVOCAT', 'PROCUREUR'], true);
+
         if (! $estJuge) {
             if (! $audience->dossier->estAccessiblePar($utilisateur)) {
                 return response()->json(['message' => "Vous n'avez pas accès à cette audience."], 403);
+            }
+
+            if ($participantDistant && ! $audience->peutEtreRejointeADistancePar($utilisateur)) {
+                return response()->json(['message' => "Aucune comparution à distance ne vous a été accordée pour cette audience."], 403);
             }
 
             if (! $audience->juge_connecte) {
