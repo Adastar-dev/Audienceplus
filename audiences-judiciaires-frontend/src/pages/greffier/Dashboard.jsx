@@ -55,6 +55,7 @@ export default function GreffierDashboard() {
     .filter((a) => a.statut === StatutAudience.PROGRAMMEE)
     .sort((a, b) => a.date_heure.localeCompare(b.date_heure))
     .slice(0, 5)
+  const enCours = audiences.filter((a) => a.statut === StatutAudience.EN_COURS)
   const demandesEnAttente = demandes.filter((d) => d.statut === StatutDemandeDistance.EN_ATTENTE).length
   const reportsEnAttente = convocations.filter((c) => c.statut === StatutConvocation.REPORT_DEMANDE).length
 
@@ -82,6 +83,40 @@ export default function GreffierDashboard() {
         <StatCard icon={Send} label="Demandes à distance" value={demandesEnAttente} />
         <StatCard icon={RotateCcw} label="Reports demandés" value={reportsEnAttente} />
       </div>
+
+      {enCours.length > 0 && (
+        <div className="mb-8">
+          <h2 className="text-sm font-medium text-navy-900 mb-2">Audiences en cours</h2>
+          <div className="bg-white border border-slate-200 rounded-md divide-y divide-slate-100">
+            {enCours.map((a) => (
+              <div key={a.id_audience} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium text-navy-900">{a.dossier?.parties}</p>
+                  <p className="text-xs text-slate-400">{a.dossier?.numero}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Link to={`/greffier/audiences/${a.id_audience}/emargement`} className="text-xs text-navy-700 hover:underline">
+                    Émargement et admissions
+                  </Link>
+                  {/* Nouvel onglet : le greffier garde l'émargement ouvert à côté. */}
+                  {a.salle_virtuelle ? (
+                  <a
+                    href={`/greffier/audiences/${a.id_audience}/rejoindre`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="bg-navy-900 text-white text-xs font-medium rounded px-3 py-2 hover:bg-navy-800 transition-colors"
+                  >
+                    Rejoindre la salle d'audience
+                  </a>
+                  ) : (
+                    <span className="text-xs text-slate-400">En présentiel</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid md:grid-cols-2 gap-6">
         <div>

@@ -21,6 +21,17 @@ class Audience extends Model
         'rappel_2h_le' => 'datetime',
     ];
 
+    protected $appends = ['salle_virtuelle'];
+
+    // Salle virtuelle (Jitsi) seulement pour une audience en ligne, ou une
+    // audience en présentiel où le juge a accordé au moins une comparution à
+    // distance (après l'avis du greffier).
+    public function getSalleVirtuelleAttribute(): bool
+    {
+        return $this->mode === 'EN_LIGNE'
+            || $this->demandeDistances()->where('statut', 'APPROUVEE')->exists();
+    }
+
     public function dossier()
     {
         return $this->belongsTo(Dossier::class, 'id_dossier', 'id_dossier');

@@ -33,7 +33,7 @@ export default function RejoindreAudience({ backTo }) {
       .finally(() => setChargement(false))
   }, [id])
 
-  const salleOuverte = audience?.statut === StatutAudience.EN_COURS && audience?.juge_connecte
+  const salleOuverte = audience?.statut === StatutAudience.EN_COURS && audience?.juge_connecte && audience?.salle_virtuelle
   const enAttente = audience && !jeton && [StatutAudience.PROGRAMMEE, StatutAudience.EN_COURS].includes(audience.statut)
 
   // Une fois entré, on garde la conférence même si le juge se déconnecte
@@ -115,6 +115,10 @@ export default function RejoindreAudience({ backTo }) {
             <p className="max-w-sm">
               Votre identité est confirmée. Le greffier ou le juge va vous faire entrer dans la salle d'audience.
             </p>
+          </div>
+        ) : audience.salle_virtuelle === false ? (
+          <div className="w-full h-full flex items-center justify-center text-navy-100 text-sm text-center px-6">
+            Cette audience se tient en présentiel : aucune comparution à distance n'a été accordée.
           </div>
         ) : erreurSalle ? (
           <div className="w-full h-full flex items-center justify-center text-navy-100 text-sm">{erreurSalle}</div>

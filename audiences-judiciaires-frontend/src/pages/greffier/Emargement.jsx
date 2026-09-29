@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, PenLine, Undo2, Loader2 } from 'lucide-react'
+import { ArrowLeft, PenLine, Undo2, Loader2, Video } from 'lucide-react'
 import { getAudienceById } from '../../services/api/audiences'
 import { listerParticipants, marquerPresent, marquerAbsent, admettreParticipant, refuserParticipant } from '../../services/api/participants'
 import { ROLE_LABELS } from '../../constants/enums'
@@ -46,10 +46,12 @@ export default function Emargement() {
       .finally(() => setChargement(false))
   }, [id])
 
-  // Rafraîchit la liste pour voir arriver les participants en salle d'attente.
+  // Rafraîchit la liste pour voir arriver les participants en salle d'attente,
+  // et l'audience pour savoir quand la salle virtuelle est ouverte.
   useEffect(() => {
     const timer = setInterval(() => {
       listerParticipants(id).then(setParticipants).catch(() => {})
+      getAudienceById(id).then(setAudience).catch(() => {})
     }, 5000)
     return () => clearInterval(timer)
   }, [id])
@@ -125,6 +127,24 @@ export default function Emargement() {
       <p className="text-xs text-slate-400 mt-1">
         Marquer un participant présent génère une signature électronique d'attestation.
       </p>
+
+      {audience.statut === 'EN_COURS' && audience.salle_virtuelle && (
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          {/* Nouvel onglet : le greffier garde cette page pour admettre les participants. */}
+          <a
+            href={`/greffier/audiences/${id}/rejoindre`}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1.5 bg-navy-900 text-white text-sm font-medium rounded px-4 py-2 hover:bg-navy-800 transition-colors"
+          >
+            <Video size={15} />
+            Rejoindre la salle d'audience
+          </a>
+          {!audience.juge_connecte && (
+            <span className="text-xs text-slate-400">Vous entrerez dès que le juge sera dans la salle.</span>
+          )}
+        </div>
+      )}
 
       {erreur && <p className="bg-danger-100 text-danger-700 text-sm rounded px-3 py-2 mt-4">{erreur}</p>}
 

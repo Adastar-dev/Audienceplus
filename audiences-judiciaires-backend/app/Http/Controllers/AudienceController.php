@@ -18,6 +18,8 @@ use App\Support\Messages;
 
 class AudienceController extends Controller
 {
+    private const PAS_DE_SALLE_VIRTUELLE = "Cette audience se tient en présentiel : aucune comparution à distance n'a été accordée.";
+
     public function __construct(private NotificationDispatcher $notifications)
     {
     }
@@ -129,10 +131,7 @@ class AudienceController extends Controller
             ], 409);
         }
 
-        $besoinSalle = $audience->mode === 'EN_LIGNE'
-            || $audience->demandeDistances()->where('statut', 'APPROUVEE')->exists();
-
-        if ($besoinSalle && ! $audience->id_salle) {
+        if ($audience->salle_virtuelle && ! $audience->id_salle) {
             $salle = $this->attribuerSalleDisponible($audience->dossier->id_tribunal);
             if ($salle) {
                 $audience->id_salle = $salle->id_salle;
@@ -167,6 +166,10 @@ class AudienceController extends Controller
 
         if ($audience->statut !== 'EN_COURS') {
             return response()->json(['message' => "L'audience n'est pas en cours."], 409);
+        }
+
+        if (! $audience->salle_virtuelle) {
+            return response()->json(['message' => self::PAS_DE_SALLE_VIRTUELLE], 409);
         }
 
         $estJuge = $utilisateur->role === 'JUGE'
@@ -220,6 +223,10 @@ class AudienceController extends Controller
 
         if ($connecte && $audience->statut !== 'EN_COURS') {
             return response()->json(['message' => "L'audience doit être ouverte avant d'entrer dans la salle."], 409);
+        }
+
+        if ($connecte && ! $audience->salle_virtuelle) {
+            return response()->json(['message' => self::PAS_DE_SALLE_VIRTUELLE], 409);
         }
 
         $audience->update(['juge_connecte' => $connecte]);

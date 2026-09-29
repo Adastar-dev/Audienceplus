@@ -185,6 +185,16 @@ export default function DossierDetail() {
                   </span>
                   <div className="flex items-center gap-2">
                     <AudienceStatusBadge statut={a.statut} />
+                    {a.statut === 'EN_COURS' && a.salle_virtuelle && (
+                      <a
+                        href={`/greffier/audiences/${a.id_audience}/rejoindre`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs font-medium text-success-700 hover:underline"
+                      >
+                        Rejoindre la salle
+                      </a>
+                    )}
                     <Link to={`/greffier/audiences/${a.id_audience}/emargement`} className="text-xs text-navy-700 hover:underline">
                       Émargement
                     </Link>

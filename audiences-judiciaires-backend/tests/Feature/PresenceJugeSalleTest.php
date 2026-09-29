@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Audience;
+use App\Models\DemandeDistance;
 use App\Models\Dossier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -295,5 +296,34 @@ class PresenceJugeSalleTest extends TestCase
         $audience->refresh();
         $this->assertFalse($audience->juge_connecte);
         $this->assertSame('JUGE', $audience->dossier->statut);
+    }
+
+    public function test_pas_de_salle_virtuelle_pour_une_audience_en_presentiel_sans_comparution_a_distance(): void
+    {
+        config(['services.jitsi.app_secret' => 'secret-de-test']);
+        $juge = $this->creerUtilisateur('JUGE');
+        $audience = $this->audienceDeTest(['id_juge' => $juge->id_utilisateur, 'mode' => 'PRESENTIEL']);
+
+        $this->actingAs($juge, 'sanctum')->getJson("/api/audiences/{$audience->id_audience}")
+            ->assertOk()->assertJsonPath('salle_virtuelle', false);
+        $this->actingAs($juge, 'sanctum')->postJson("/api/audiences/{$audience->id_audience}/juge-connecte")
+            ->assertStatus(409);
+        $this->actingAs($juge, 'sanctum')->getJson("/api/audiences/{$audience->id_audience}/jitsi-jeton")
+            ->assertStatus(409);
+
+        // Une demande seulement en attente ou avec l'avis du greffier ne suffit pas.
+        $demande = DemandeDistance::create([
+            'id_audience' => $audience->id_audience, 'id_utilisateur' => $this->creerUtilisateur('JUSTICIABLE')->id_utilisateur,
+            'motif' => 'Réside à Paris', 'statut' => 'AVIS_GREFFIER_FAVORABLE', 'date_demande' => now(),
+        ]);
+        $this->actingAs($juge, 'sanctum')->postJson("/api/audiences/{$audience->id_audience}/juge-connecte")
+            ->assertStatus(409);
+
+        // Comparution à distance accordée par le juge : la salle s'ouvre.
+        $demande->update(['statut' => 'APPROUVEE']);
+        $this->actingAs($juge, 'sanctum')->postJson("/api/audiences/{$audience->id_audience}/juge-connecte")
+            ->assertOk()->assertJsonPath('salle_virtuelle', true);
+        $this->actingAs($juge, 'sanctum')->getJson("/api/audiences/{$audience->id_audience}/jitsi-jeton")
+            ->assertOk()->assertJsonPath('moderateur', true);
     }
 }

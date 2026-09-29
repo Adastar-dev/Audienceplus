@@ -32,7 +32,7 @@ export default function AudienceDetail() {
   async function handleOuvrir() {
     try {
       const updated = await ouvrirAudience(id)
-      setAudience((a) => ({ ...a, statut: updated.statut }))
+      setAudience((a) => ({ ...a, statut: updated.statut, salle_virtuelle: updated.salle_virtuelle }))
     } catch {
       setErreur("Impossible d'ouvrir l'audience.")
     }
@@ -133,12 +133,16 @@ export default function AudienceDetail() {
         ) : audience.statut === StatutAudience.EN_COURS ? (
           <div className="flex items-center gap-3">
             <span className="text-sm text-success-700 font-medium">Audience en cours</span>
-            <button
-              onClick={() => navigate(`/juge/audiences/${id}/salle`)}
-              className="bg-navy-900 text-white text-sm font-medium rounded px-4 py-2 hover:bg-navy-800 transition-colors"
-            >
-              Rejoindre la salle virtuelle
-            </button>
+            {audience.salle_virtuelle ? (
+              <button
+                onClick={() => navigate(`/juge/audiences/${id}/salle`)}
+                className="bg-navy-900 text-white text-sm font-medium rounded px-4 py-2 hover:bg-navy-800 transition-colors"
+              >
+                Rejoindre la salle virtuelle
+              </button>
+            ) : (
+              <span className="text-xs text-slate-400">En présentiel : aucune comparution à distance accordée.</span>
+            )}
           </div>
         ) : (
           <p className="text-sm text-slate-400">Cette audience n'est plus modifiable.</p>

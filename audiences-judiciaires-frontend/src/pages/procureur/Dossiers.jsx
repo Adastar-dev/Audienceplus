@@ -6,7 +6,7 @@ import { listerPieces } from '../../services/api/pieces'
 import { listerAudiences } from '../../services/api/audiences'
 import { getPV, donnerAvisPV } from '../../services/api/procesVerbaux'
 import DossierStatusBadge from '../../components/ui/DossierStatusBadge'
-import { STATUT_PV_LABELS } from '../../constants/enums'
+import { STATUT_PV_LABELS, StatutAudience } from '../../constants/enums'
 
 export default function DossiersProcureur() {
   const [dossiers, setDossiers] = useState([])
@@ -55,6 +55,18 @@ export default function DossiersProcureur() {
 
   const audienceLiee = selection
     ? audiences.find((a) => a.id_dossier === selection.id_dossier)
+    : null
+  // Audience à rejoindre à distance : à venir ou en cours, avec une salle
+  // virtuelle (audience en ligne ou comparution à distance accordée).
+  const audienceADistance = selection
+    ? audiences
+        .filter(
+          (a) =>
+            a.id_dossier === selection.id_dossier &&
+            a.salle_virtuelle &&
+            [StatutAudience.PROGRAMMEE, StatutAudience.EN_COURS].includes(a.statut),
+        )
+        .sort((a, b) => a.date_heure.localeCompare(b.date_heure))[0]
     : null
 
   async function envoyerAvisDossier() {
@@ -119,9 +131,9 @@ export default function DossiersProcureur() {
           <div className="space-y-4">
             {selection ? (
               <>
-                {audienceLiee && (
+                {audienceADistance && (
                   <Link
-                    to={`/procureur/salle-attente/${audienceLiee.id_audience}`}
+                    to={`/procureur/salle-attente/${audienceADistance.id_audience}`}
                     className="flex items-center gap-2 bg-navy-900 text-white text-sm font-medium rounded px-4 py-2 hover:bg-navy-800 transition-colors w-fit"
                   >
                     <Video size={15} />

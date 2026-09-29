@@ -105,6 +105,7 @@ export default function AppRoutes() {
           <Route path="/greffier/audiences/:id/pv" element={<RedactionPV />} />
           <Route path="/greffier/audiences/:id/emargement" element={<Emargement />} />
         </Route>
+        <Route path="/greffier/audiences/:id/rejoindre" element={<RejoindreAudience backTo="/greffier" />} />
       </Route>
 
       {/* Première connexion d'un compte créé par l'administrateur (hors garde CNI). */}
