@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\CodeQr;
+use App\Support\Verification;
 use Illuminate\Database\Eloquent\Model;
 
 class CasierJudiciaire extends Model
@@ -17,12 +18,17 @@ class CasierJudiciaire extends Model
         'date_demandee' => 'datetime',
     ];
 
-    // QR code de la référence du casier (unique), affiché à l'utilisateur.
-    protected $appends = ['qr_image'];
+    // QR code menant à la page publique de vérification de l'extrait.
+    protected $appends = ['qr_image', 'url_verification'];
 
     public function getQrImageAttribute(): ?string
     {
-        return $this->qr_code ? CodeQr::dataUri($this->qr_code) : null;
+        return $this->qr_code ? CodeQr::dataUri(Verification::url($this->qr_code)) : null;
+    }
+
+    public function getUrlVerificationAttribute(): ?string
+    {
+        return $this->qr_code ? Verification::url($this->qr_code) : null;
     }
 
     public function utilisateur()

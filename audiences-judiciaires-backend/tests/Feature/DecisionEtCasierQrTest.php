@@ -109,4 +109,80 @@ class DecisionEtCasierQrTest extends TestCase
 
         $this->actingAs($autre, 'sanctum')->getJson("/api/casier-judiciaire/{$id}/pdf")->assertStatus(403);
     }
+
+    // --- Vérification publique à partir du QR code ---
+
+    public function test_la_decision_se_verifie_sans_connexion_et_detecte_une_empreinte_falsifiee(): void
+    {
+        $audience = $this->audienceJugee($this->creerUtilisateur('JUSTICIABLE'));
+        $reference = \App\Http\Controllers\DecisionController::reference($audience);
+        $empreinte = \App\Http\Controllers\DecisionController::empreinte($audience);
+
+        $this->getJson("/api/verification/{$reference}?e={$empreinte}")
+            ->assertOk()
+            ->assertJsonPath('authentique', true)
+            ->assertJsonPath('empreinte_conforme', true)
+            ->assertJsonPath('dossier', $audience->dossier->numero)
+            ->assertJsonMissingPath('parties');
+
+        // Décision modifiée après impression : l'empreinte imprimée ne correspond plus.
+        $audience->update(['motif_decision' => 'Motif modifié.']);
+        $this->getJson("/api/verification/{$reference}?e={$empreinte}")
+            ->assertOk()
+            ->assertJsonPath('empreinte_conforme', false);
+    }
+
+    public function test_lextrait_de_casier_se_verifie_avec_un_nom_masque(): void
+    {
+        $titulaire = $this->creerUtilisateur('JUSTICIABLE', ['nom' => 'Awa Diop']);
+        $casier = $this->actingAs($titulaire, 'sanctum')->postJson('/api/casier-judiciaire')->json();
+        $this->assertStringEndsWith('/verification/'.$casier['qr_code'], $casier['url_verification']);
+
+        $this->app['auth']->forgetGuards();
+        $this->getJson('/api/verification/'.$casier['qr_code'])
+            ->assertOk()
+            ->assertJsonPath('type', 'CASIER')
+            ->assertJsonPath('titulaire', 'A. D***')
+            ->assertJsonPath('resultat', 'Néant');
+    }
+
+    public function test_une_reference_inconnue_ou_une_decision_non_rendue_nest_pas_authentifiee(): void
+    {
+        $this->getJson('/api/verification/AJ-CJ-2026-999999-ZZZZ')->assertStatus(404)->assertJsonPath('authentique', false);
+        $this->getJson('/api/verification/nimporte-quoi')->assertStatus(404);
+
+        $audience = $this->audienceJugee($this->creerUtilisateur('JUSTICIABLE'), 'DIVORCE', ['statut' => 'EN_COURS', 'type_decision' => null]);
+        $this->getJson('/api/verification/'.\App\Http\Controllers\DecisionController::reference($audience))->assertStatus(404);
+    }
+
+    public function test_le_pdf_complet_parties_comparution_avis_et_pv_scelle(): void
+    {
+        $justiciable = $this->creerUtilisateur('JUSTICIABLE');
+        $avocat = $this->creerUtilisateur('AVOCAT');
+        $procureur = $this->creerUtilisateur('PROCUREUR');
+        $audience = $this->audienceJugee($justiciable, 'ADOPTION', ['mode' => 'PRESENTIEL']);
+        $audience->dossier->update(['avis_procureur' => 'Avis favorable.', 'avis_procureur_par' => $procureur->id_utilisateur]);
+        $this->lierPartie($audience->dossier, $avocat);
+        \App\Models\DemandeDistance::create([
+            'id_audience' => $audience->id_audience, 'id_utilisateur' => $justiciable->id_utilisateur,
+            'motif' => 'Réside à Paris', 'statut' => 'APPROUVEE', 'date_demande' => now(),
+        ]);
+        \App\Models\ParticipationAudience::create([
+            'id_audience' => $audience->id_audience, 'id_utilisateur' => $justiciable->id_utilisateur,
+            'role_audience' => 'JUSTICIABLE', 'present' => true,
+        ]);
+        $pv = \App\Models\ProcesVerbal::create([
+            'id_audience' => $audience->id_audience, 'contenu' => 'Déroulement de l\'audience.',
+            'statut' => 'CLOTURE', 'date_validation' => now(),
+        ]);
+        \App\Models\Signature::create([
+            'id_utilisateur' => $this->creerUtilisateur('JUGE')->id_utilisateur, 'type_document' => 'PROCES_VERBAL',
+            'id_document_signe' => $pv->id_pv, 'hash' => str_repeat('a', 64), 'date_signature' => now(),
+        ]);
+
+        $reponse = $this->actingAs($justiciable, 'sanctum')
+            ->get("/api/audiences/{$audience->id_audience}/decision/pdf")
+            ->assertOk();
+        $this->assertStringStartsWith('%PDF', $reponse->getContent());
+    }
 }

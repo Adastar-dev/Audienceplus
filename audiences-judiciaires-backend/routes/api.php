@@ -19,10 +19,14 @@ use App\Http\Controllers\SignatureController;
 use App\Http\Controllers\StatistiqueController;
 use App\Http\Controllers\TribunalController;
 use App\Http\Controllers\UtilisateurController;
+use App\Http\Controllers\VerificationController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/inscription', [AuthController::class, 'inscription'])->middleware('throttle:5,1');
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+
+// Vérification publique d'un document à partir de la référence de son QR code.
+Route::get('/verification/{reference}', [VerificationController::class, 'show'])->middleware('throttle:30,1');
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);

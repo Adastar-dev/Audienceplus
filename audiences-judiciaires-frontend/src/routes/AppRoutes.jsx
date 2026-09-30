@@ -59,6 +59,7 @@ import Logs from '../pages/admin/Logs'
 import Statistiques from '../pages/admin/Statistiques'
 
 import RejoindreAudience from '../pages/shared/RejoindreAudience'
+import Verification from '../pages/public/Verification'
 
 export default function AppRoutes() {
   const navigate = useNavigate()
@@ -77,6 +78,9 @@ export default function AppRoutes() {
     <Routes>
       <Route path="/connexion" element={<Login />} />
       <Route path="/inscription" element={<Inscription />} />
+      {/* Vérification publique d'un document à partir de son QR code. */}
+      <Route path="/verification" element={<Verification />} />
+      <Route path="/verification/:reference" element={<Verification />} />
 
       <Route element={<ProtectedRoute allowedRoles={[Role.JUGE]} />}>
         <Route element={<DashboardLayout />}>

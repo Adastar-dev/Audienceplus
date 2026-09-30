@@ -1,0 +1,507 @@
+{
+  "info": {
+    "_postman_id": "4590dc6a-3b6c-498a-9d2e-ef0e41b42deb",
+    "name": "Audience+ - tests API",
+    "description": "Vérifications de l'API Audience+ : authentification, contrôle d'accès (401 / 403), validation des données (422) et vérification publique des QR codes.\n\nComptes de test dédiés (postman.greffier@test.sn, postman.justiciable@test.sn) à renseigner (mots de passe) dans l'onglet Variables, puis lancer la collection avec Run collection. La connexion est limitée à 5 essais par minute.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000/api"
+    },
+    {
+      "key": "email_greffier",
+      "value": "postman.greffier@test.sn"
+    },
+    {
+      "key": "mdp_greffier",
+      "value": "A_RENSEIGNER"
+    },
+    {
+      "key": "email_justiciable",
+      "value": "postman.justiciable@test.sn"
+    },
+    {
+      "key": "mdp_justiciable",
+      "value": "A_RENSEIGNER"
+    },
+    {
+      "key": "id_dossier_etranger",
+      "value": "3",
+      "description": "Dossier auquel le justiciable n'est pas partie"
+    },
+    {
+      "key": "reference_casier",
+      "value": "AJ-CJ-2026-000001-P5CS"
+    },
+    {
+      "key": "token_greffier",
+      "value": ""
+    },
+    {
+      "key": "token_justiciable",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Authentification",
+      "item": [
+        {
+          "name": "Connexion du greffier",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Connexion acceptée (200)\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Un jeton Sanctum est renvoyé\", () => pm.expect(r.token).to.be.a(\"string\"));",
+                  "pm.test(\"Le mot de passe n'est jamais renvoyé\", () => pm.expect(r.user).to.not.have.property(\"mot_de_passe\"));",
+                  "pm.collectionVariables.set(\"token_greffier\", r.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "login"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifiant\": \"{{email_greffier}}\",\n  \"mot_de_passe\": \"{{mdp_greffier}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Connexion du justiciable",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Connexion acceptée (200)\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"token_justiciable\", pm.response.json().token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "login"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifiant\": \"{{email_justiciable}}\",\n  \"mot_de_passe\": \"{{mdp_justiciable}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Mot de passe incorrect",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Identifiants refusés (401)\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Aucun jeton délivré\", () => pm.expect(pm.response.json()).to.not.have.property(\"token\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "login"
+              ]
+            },
+            "description": "Compte aussi dans les 5 échecs qui bloquent le compte 15 minutes.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifiant\": \"{{email_greffier}}\",\n  \"mot_de_passe\": \"mauvais-mot-de-passe\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Contrôle d'accès",
+      "item": [
+        {
+          "name": "Sans jeton : accès refusé",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Requête non authentifiée refusée (401)\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/dossiers",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "dossiers"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Justiciable qui crée un dossier : rôle refusé",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Rôle non autorisé refusé par EnsureRole (403)\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_justiciable}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/dossiers",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "dossiers"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"DIVORCE\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Justiciable qui ouvre le dossier d'un autre",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Dossier étranger inaccessible (403)\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_justiciable}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/dossiers/{{id_dossier_etranger}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "dossiers",
+                "{{id_dossier_etranger}}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Greffier sur une route d'administration",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Route réservée à l'administrateur (403)\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_greffier}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/utilisateurs",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "utilisateurs"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Greffier : liste des dossiers de son tribunal",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Accès autorisé (200)\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Réponse sous forme de liste\", () => pm.expect(pm.response.json()).to.be.an(\"array\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_greffier}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/dossiers",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "dossiers"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Validation des données",
+      "item": [
+        {
+          "name": "Audience programmée dans le passé",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Données invalides refusées (422)\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"L'erreur porte sur la date\", () => pm.expect(pm.response.json().errors).to.have.property(\"date_heure\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_greffier}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/audiences",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "audiences"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_dossier\": \"{{id_dossier_etranger}}\",\n  \"date_heure\": \"2020-01-01 09:00:00\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Vérification publique des QR codes",
+      "item": [
+        {
+          "name": "Extrait de casier authentique (sans connexion)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Référence reconnue (200)\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Document authentique\", () => pm.expect(r.authentique).to.eql(true));",
+                  "pm.test(\"Nom du titulaire masqué\", () => pm.expect(r.titulaire).to.match(/\\*\\*\\*$/));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/verification/{{reference_casier}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "verification",
+                "{{reference_casier}}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Référence inconnue",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Référence inconnue (404)\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Document non authentifié\", () => pm.expect(pm.response.json().authentique).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/verification/AJ-CJ-2026-999999-ZZZZ",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "verification",
+                "AJ-CJ-2026-999999-ZZZZ"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    }
+  ]
+}

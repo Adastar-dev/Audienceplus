@@ -68,10 +68,16 @@ export default function CasierJudiciaire() {
                   <Badge tone={d.resultat === ResultatCasier.VIERGE ? 'success' : 'danger'}>
                     {d.resultat === ResultatCasier.VIERGE ? 'Casier vierge' : 'Casier non vierge'}
                   </Badge>
-                  <span className="flex items-center gap-1 text-xs text-slate-400">
+                  <a
+                    href={`/verification/${d.qr_code}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="Page publique de vérification, ouverte aussi en scannant le QR code"
+                    className="flex items-center gap-1 text-xs text-slate-400 hover:text-navy-900 hover:underline"
+                  >
                     <QrCode size={13} />
                     {d.qr_code}
-                  </span>
+                  </a>
                 </div>
               </div>
               <button

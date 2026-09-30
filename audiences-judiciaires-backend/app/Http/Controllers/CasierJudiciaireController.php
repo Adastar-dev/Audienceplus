@@ -52,6 +52,6 @@ class CasierJudiciaireController extends Controller
         return Pdf::loadView('pdf.casier', [
             'casier' => $casier,
             'titulaire' => $request->user(),
-        ])->download("casier-{$casier->qr_code}.pdf");
+        ])->setOption('enable_font_subsetting', true)->download("casier-{$casier->qr_code}.pdf");
     }
 }

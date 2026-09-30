@@ -1,5 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 
+const HOTES_LOCAUX = ['localhost', '127.0.0.1']
+
+// Le backend annonce « localhost:8443 ». Ouverte depuis un autre appareil du
+// réseau (téléphone, second PC, via l'adresse IP du PC), la page doit viser
+// cette même machine : sur le téléphone, « localhost » serait le téléphone.
+function domaineAccessible(domain) {
+  const [hote, port] = domain.split(':')
+  const hotePage = window.location.hostname
+  if (HOTES_LOCAUX.includes(hote) && !HOTES_LOCAUX.includes(hotePage)) {
+    return port ? `${hotePage}:${port}` : hotePage
+  }
+  return domain
+}
+
 function loadJitsiScript(domain) {
   return new Promise((resolve, reject) => {
     if (window.JitsiMeetExternalAPI) {
@@ -25,7 +39,8 @@ function loadJitsiScript(domain) {
 // d'être admis explicitement - c'est le vrai mécanisme d'admission,
 // distinct du champ `admis` stocké en base (qui sert de journal/trace,
 // pas de barrière d'accès réelle).
-export default function JitsiMeetRoom({ domain, roomName, jwt, displayName, moderator = false, onJoined, onLeft, onApiReady }) {
+export default function JitsiMeetRoom({ domain: domaineAnnonce, roomName, jwt, displayName, moderator = false, onJoined, onLeft, onApiReady }) {
+  const domain = domaineAccessible(domaineAnnonce)
   const containerRef = useRef(null)
   const apiRef = useRef(null)
   const [status, setStatus] = useState('loading')
