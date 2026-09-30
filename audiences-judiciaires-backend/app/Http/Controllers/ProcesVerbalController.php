@@ -214,7 +214,7 @@ class ProcesVerbalController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'audio' => 'required|file|mimes:mp3,wav,m4a,ogg,webm,mp4|max:25600',
+            'audio' => 'required|file|mimes:mp3,wav,m4a,ogg,opus,webm,weba,mp4|max:25600',
         ]);
 
         if ($validator->fails()) {

@@ -67,6 +67,9 @@ class RbacTest extends TestCase
             $this->actingAs($autreJuge, 'sanctum')->postJson("/api/audiences/{$audience->id_audience}/{$action}", ['type' => 'RENVOI'])->assertStatus(403);
         }
         $this->actingAs($this->creerUtilisateur('JUSTICIABLE'), 'sanctum')->getJson("/api/audiences/{$audience->id_audience}/participants")->assertStatus(403);
+        // Pas d'ouverture la veille : seulement 30 minutes avant l'heure prévue.
+        $this->actingAs($juge, 'sanctum')->postJson("/api/audiences/{$audience->id_audience}/ouvrir")->assertStatus(409);
+        $audience->update(['date_heure' => now()->addMinutes(20)]);
         $this->actingAs($juge, 'sanctum')->postJson("/api/audiences/{$audience->id_audience}/ouvrir")->assertOk();
     }
 

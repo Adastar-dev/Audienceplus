@@ -110,6 +110,15 @@ class Audience extends Model
     // et non dès la minute qui suit l'heure prévue.
     public const DUREE_CRENEAU_MINUTES = \App\Services\DisponibiliteJuge::DUREE_MINUTES;
 
+    // Le juge ouvre l'audience, et les participants distants accèdent à la
+    // salle d'attente, au plus tôt 30 minutes avant l'heure prévue.
+    public const OUVERTURE_AVANT_MINUTES = 30;
+
+    public function heureOuverture(): \Illuminate\Support\Carbon
+    {
+        return $this->date_heure->copy()->subMinutes(self::OUVERTURE_AVANT_MINUTES);
+    }
+
     public static function marquerRatees(): void
     {
         static::where('statut', 'PROGRAMMEE')

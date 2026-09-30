@@ -138,6 +138,13 @@ class AudienceController extends Controller
             ], 409);
         }
 
+        // Pas d'ouverture anticipée : une audience commence à son heure.
+        if (now()->lt($audience->heureOuverture())) {
+            return response()->json([
+                'message' => "Cette audience ne peut être ouverte qu'à partir du {$audience->heureOuverture()->format('d/m/Y à H:i')}.",
+            ], 409);
+        }
+
         if ($audience->salle_virtuelle && ! $audience->id_salle) {
             $salle = $this->attribuerSalleDisponible($audience->dossier->id_tribunal);
             if ($salle) {

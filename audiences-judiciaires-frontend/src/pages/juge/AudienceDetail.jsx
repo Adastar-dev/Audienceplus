@@ -34,8 +34,8 @@ export default function AudienceDetail() {
     try {
       const updated = await ouvrirAudience(id)
       setAudience((a) => ({ ...a, statut: updated.statut, salle_virtuelle: updated.salle_virtuelle }))
-    } catch {
-      setErreur("Impossible d'ouvrir l'audience.")
+    } catch (err) {
+      setErreur(err.response?.data?.message || "Impossible d'ouvrir l'audience.")
     }
   }
 
@@ -87,6 +87,10 @@ export default function AudienceDetail() {
   }
 
   const estOuvrable = audience.statut === StatutAudience.PROGRAMMEE
+  // Même règle que le serveur (Audience::OUVERTURE_AVANT_MINUTES) : ouverture
+  // possible au plus tôt 30 minutes avant l'heure prévue.
+  const heureOuverture = new Date(new Date(audience.date_heure).getTime() - 30 * 60 * 1000)
+  const tropTot = new Date() < heureOuverture
   const pieces = audience.dossier?.pieces ?? []
 
   return (
@@ -124,13 +128,22 @@ export default function AudienceDetail() {
         </div>
 
         {estOuvrable ? (
-          <button
-            onClick={handleOuvrir}
-            className="flex items-center gap-2 bg-gold-600 text-white text-sm font-medium rounded px-4 py-2 hover:opacity-90 transition-opacity"
-          >
-            <Gavel size={16} />
-            Ouvrir l'audience
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={handleOuvrir}
+              disabled={tropTot}
+              className="flex items-center gap-2 bg-gold-600 text-white text-sm font-medium rounded px-4 py-2 hover:opacity-90 disabled:opacity-40 transition-opacity"
+            >
+              <Gavel size={16} />
+              Ouvrir l'audience
+            </button>
+            {tropTot && (
+              <span className="text-xs text-slate-400">
+                Ouverture possible à partir du{' '}
+                {heureOuverture.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}.
+              </span>
+            )}
+          </div>
         ) : audience.statut === StatutAudience.EN_COURS ? (
           <div className="flex items-center gap-3">
             <span className="text-sm text-success-700 font-medium">Audience en cours</span>

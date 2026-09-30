@@ -99,8 +99,6 @@ class ParticipationController extends Controller
         return response()->json($participation);
     }
 
-    private const OUVERTURE_AVANT_MINUTES = 30;
-
     // La salle d'attente virtuelle n'est accessible que dans une fenetre autour
     // de l'heure programmee : 30 minutes avant, jusqu'a ce que l'audience se
     // termine (cloturee, renvoyee, ou marquee ratee automatiquement si l'heure
@@ -115,7 +113,7 @@ class ParticipationController extends Controller
             return response()->json(['message' => 'Cette audience est terminée.'], 403);
         }
 
-        $ouverture = $audience->date_heure->copy()->subMinutes(self::OUVERTURE_AVANT_MINUTES);
+        $ouverture = $audience->heureOuverture();
 
         if (now()->lt($ouverture)) {
             return response()->json([

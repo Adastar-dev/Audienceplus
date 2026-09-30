@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, Send, FileDown, Loader2, AlertTriangle, AudioLines } from 'lucide-react'
+import { ArrowLeft, Send, FileDown, Loader2, AlertTriangle, AudioLines, Mic, Square } from 'lucide-react'
 import { getAudienceById } from '../../services/api/audiences'
 import { getPV, enregistrerBrouillon, transmettrePV, transcrireAudio } from '../../services/api/procesVerbaux'
-import { StatutPV } from '../../constants/enums'
+import { StatutAudience, StatutPV } from '../../constants/enums'
 import PVStatusBadge from '../../components/ui/PVStatusBadge'
 
 export default function RedactionPV() {
@@ -21,6 +21,11 @@ export default function RedactionPV() {
   const [transcription, setTranscription] = useState('')
   const [messageTranscription, setMessageTranscription] = useState('')
   const [transcriptionEnCours, setTranscriptionEnCours] = useState(false)
+  // Enregistrement direct du micro du greffier pendant l'audience.
+  const [enregistrement, setEnregistrement] = useState(false)
+  const [secondes, setSecondes] = useState(0)
+  const enregistreurRef = useRef(null)
+  const morceauxRef = useRef([])
 
   useEffect(() => {
     Promise.all([getAudienceById(id), getPV(id)])
@@ -64,13 +69,13 @@ export default function RedactionPV() {
 
   // Le texte transcrit n'est jamais copié d'office dans le PV : le greffier le
   // relit, l'insère puis le corrige (la transcription reste un brouillon).
-  async function handleTranscrire() {
-    if (!audio) return
+  async function handleTranscrire(fichier = audio) {
+    if (!fichier) return
     setErreur('')
     setMessageTranscription('')
     setTranscriptionEnCours(true)
     try {
-      const resultat = await transcrireAudio(id, audio)
+      const resultat = await transcrireAudio(id, fichier)
       if (resultat.transcription_disponible) {
         setTranscription(resultat.pv.transcription_brute ?? '')
       } else {
@@ -87,6 +92,57 @@ export default function RedactionPV() {
       setTranscriptionEnCours(false)
     }
   }
+
+  // Le navigateur enregistre le micro (MediaRecorder, format webm/opus) ; à
+  // l'arrêt, le fichier part directement à la transcription.
+  async function demarrerEnregistrement() {
+    setErreur('')
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      setErreur("Ce navigateur ne permet pas d'enregistrer ici (une connexion sécurisée est nécessaire) : utilisez un fichier audio.")
+      return
+    }
+    try {
+      const flux = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const enregistreur = new MediaRecorder(flux)
+      morceauxRef.current = []
+      enregistreur.ondataavailable = (e) => e.data.size > 0 && morceauxRef.current.push(e.data)
+      enregistreur.onstop = () => {
+        flux.getTracks().forEach((piste) => piste.stop())
+        const type = enregistreur.mimeType || 'audio/webm'
+        const extension = type.includes('ogg') ? 'ogg' : type.includes('mp4') ? 'm4a' : 'webm'
+        const fichier = new File(morceauxRef.current, `enregistrement-audience-${id}.${extension}`, { type })
+        handleTranscrire(fichier)
+      }
+      enregistreur.start(1000)
+      enregistreurRef.current = enregistreur
+      setSecondes(0)
+      setEnregistrement(true)
+    } catch {
+      setErreur("Accès au micro refusé : autorisez le micro dans le navigateur, ou envoyez un fichier audio.")
+    }
+  }
+
+  function arreterEnregistrement() {
+    enregistreurRef.current?.stop()
+    enregistreurRef.current = null
+    setEnregistrement(false)
+  }
+
+  // Chronomètre pendant l'enregistrement.
+  useEffect(() => {
+    if (!enregistrement) return
+    const timer = setInterval(() => setSecondes((s) => s + 1), 1000)
+    return () => clearInterval(timer)
+  }, [enregistrement])
+
+  // Quitter la page arrête le micro sans envoyer l'enregistrement.
+  useEffect(() => () => {
+    const enregistreur = enregistreurRef.current
+    if (enregistreur) {
+      enregistreur.onstop = () => enregistreur.stream.getTracks().forEach((piste) => piste.stop())
+      enregistreur.stop()
+    }
+  }, [])
 
   function insererTranscription() {
     setContenu((c) => (c.trim() ? `${c}\n\n${transcription}` : transcription))
@@ -128,6 +184,9 @@ export default function RedactionPV() {
   }
 
   const modifiable = statut === StatutPV.EN_COURS
+  // L'enregistrement en direct n'a de sens que pendant l'audience (présentiel,
+  // hybride ou en ligne) ; un fichier peut être envoyé à tout moment.
+  const audienceEnCours = audience.statut === StatutAudience.EN_COURS
 
   return (
     <div>
@@ -164,23 +223,59 @@ export default function RedactionPV() {
             <h2 className="text-sm font-medium text-navy-900">Transcription de l'enregistrement</h2>
           </div>
           <p className="text-xs text-slate-400 mb-3">
-            Fichier audio de l'audience (mp3, wav, m4a, ogg, webm ou mp4, 25 Mo maximum), transcrit automatiquement pour
+            Pendant l'audience, enregistrez les débats avec le micro de cet ordinateur ; vous pouvez aussi envoyer un
+            fichier audio (mp3, wav, m4a, ogg, webm ou mp4, 25 Mo maximum). Le texte est transcrit automatiquement pour
             servir de base au procès-verbal.
           </p>
+          {!audienceEnCours && !enregistrement && (
+            <p className="text-xs text-slate-500 mb-3">
+              L'enregistrement en direct est disponible quand le juge a ouvert l'audience.
+            </p>
+          )}
+          {(audienceEnCours || enregistrement) && (
+          <div className="flex flex-wrap items-center gap-3 mb-3">
+            {enregistrement ? (
+              <button
+                onClick={arreterEnregistrement}
+                className="flex items-center gap-2 bg-danger-700 text-white text-sm font-medium rounded px-4 py-2 hover:opacity-90 transition-opacity"
+              >
+                <Square size={14} />
+                Arrêter et transcrire
+              </button>
+            ) : (
+              <button
+                onClick={demarrerEnregistrement}
+                disabled={transcriptionEnCours}
+                className="flex items-center gap-2 bg-navy-900 text-white text-sm font-medium rounded px-4 py-2 hover:bg-navy-800 disabled:opacity-40 transition-colors"
+              >
+                <Mic size={15} />
+                Enregistrer l'audience
+              </button>
+            )}
+            {enregistrement && (
+              <span className="flex items-center gap-2 text-sm text-danger-700">
+                <span className="w-2 h-2 rounded-full bg-danger-700 animate-pulse" />
+                Enregistrement en cours · {String(Math.floor(secondes / 60)).padStart(2, '0')}:
+                {String(secondes % 60).padStart(2, '0')}
+              </span>
+            )}
+          </div>
+          )}
           <div className="flex flex-wrap items-center gap-3">
             <input
               type="file"
               accept="audio/*,.mp3,.wav,.m4a,.ogg,.webm,.mp4"
               onChange={(e) => setAudio(e.target.files?.[0] ?? null)}
+              disabled={enregistrement}
               className="text-sm text-slate-600 file:mr-3 file:rounded file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm"
             />
             <button
-              onClick={handleTranscrire}
-              disabled={!audio || transcriptionEnCours}
+              onClick={() => handleTranscrire()}
+              disabled={!audio || transcriptionEnCours || enregistrement}
               className="flex items-center gap-2 border border-slate-200 text-navy-900 text-sm font-medium rounded px-4 py-2 hover:bg-navy-50 disabled:opacity-40 transition-colors"
             >
               {transcriptionEnCours && <Loader2 size={15} className="animate-spin" />}
-              {transcriptionEnCours ? 'Transcription...' : 'Transcrire'}
+              {transcriptionEnCours ? 'Transcription...' : 'Transcrire le fichier'}
             </button>
           </div>
           {messageTranscription && (
