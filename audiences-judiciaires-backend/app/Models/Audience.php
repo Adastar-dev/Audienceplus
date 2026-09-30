@@ -53,6 +53,18 @@ class Audience extends Model
             ->exists();
     }
 
+    // Agir sur l'audience au nom de la juridiction (l'ouvrir, trancher une
+    // demande, admettre un participant, émarger) : son juge, ou tout juge si
+    // aucun n'est désigné ; pour le greffier, le dossier doit relever de son tribunal.
+    public function estGereePar(Utilisateur $utilisateur): bool
+    {
+        if ($utilisateur->role === 'JUGE') {
+            return ! $this->id_juge || (int) $this->id_juge === (int) $utilisateur->id_utilisateur;
+        }
+
+        return $utilisateur->role === 'GREFFIER' && $this->dossier->estAccessiblePar($utilisateur);
+    }
+
     public function dossier()
     {
         return $this->belongsTo(Dossier::class, 'id_dossier', 'id_dossier');
@@ -93,10 +105,15 @@ class Audience extends Model
         return "audience-{$this->id_audience}";
     }
 
+    // Une audience occupe un créneau d'une heure (voir DisponibiliteJuge) : elle
+    // n'est « ratée » que si le juge ne l'a pas ouverte avant la fin de ce créneau,
+    // et non dès la minute qui suit l'heure prévue.
+    public const DUREE_CRENEAU_MINUTES = \App\Services\DisponibiliteJuge::DUREE_MINUTES;
+
     public static function marquerRatees(): void
     {
         static::where('statut', 'PROGRAMMEE')
-            ->where('date_heure', '<', now())
+            ->where('date_heure', '<', now()->subMinutes(self::DUREE_CRENEAU_MINUTES))
             ->update(['statut' => 'RATEE']);
     }
 }

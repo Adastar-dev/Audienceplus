@@ -1,0 +1,21 @@
+$kind: http-request
+description: ""
+url: "{{base_url}}/login"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "identifiant": "{{email_justiciable}}",
+      "mot_de_passe": "{{mdp_justiciable}}"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Connexion acceptée (200)", () => pm.response.to.have.status(200));
+      pm.collectionVariables.set("token_justiciable", pm.response.json().token);
+    language: text/javascript
+order: 2000

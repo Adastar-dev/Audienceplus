@@ -9,7 +9,6 @@ use App\Models\Signature;
 use App\Services\DocumentHashService;
 use App\Services\OtpService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 class ParticipationController extends Controller
@@ -20,8 +19,12 @@ class ParticipationController extends Controller
     ) {
     }
 
-    public function index(Audience $audience)
+    public function index(Request $request, Audience $audience)
     {
+        if (! $audience->dossier->estAccessiblePar($request->user())) {
+            return response()->json(['message' => "Vous n'avez pas accès à cette audience."], 403);
+        }
+
         $existantes = ParticipationAudience::where('id_audience', $audience->id_audience)->count();
 
         if ($existantes === 0) {
@@ -47,8 +50,26 @@ class ParticipationController extends Controller
         );
     }
 
+    // Émargement par le greffier du tribunal, pour une participation de cette audience.
+    private function refuserSiPasDeLAudience(Request $request, Audience $audience, ParticipationAudience $participation)
+    {
+        if ((int) $participation->id_audience !== (int) $audience->id_audience) {
+            abort(404);
+        }
+
+        if (! $audience->estGereePar($request->user())) {
+            return response()->json(['message' => "Vous n'avez pas accès à cette audience."], 403);
+        }
+
+        return null;
+    }
+
     public function marquerPresent(Request $request, Audience $audience, ParticipationAudience $participation)
     {
+        if ($refus = $this->refuserSiPasDeLAudience($request, $audience, $participation)) {
+            return $refus;
+        }
+
         $participation->update(['present' => true]);
 
         $contenu = $this->hasher->contenuAHacher('PARTICIPATION', $participation->id_participation);
@@ -67,8 +88,12 @@ class ParticipationController extends Controller
         ]);
     }
 
-    public function marquerAbsent(Audience $audience, ParticipationAudience $participation)
+    public function marquerAbsent(Request $request, Audience $audience, ParticipationAudience $participation)
     {
+        if ($refus = $this->refuserSiPasDeLAudience($request, $audience, $participation)) {
+            return $refus;
+        }
+
         $participation->update(['present' => false]);
 
         return response()->json($participation);

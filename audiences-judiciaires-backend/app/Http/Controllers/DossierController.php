@@ -165,6 +165,10 @@ class DossierController extends Controller
 
     public function update(Request $request, Dossier $dossier)
     {
+        if (! $dossier->estAccessiblePar($request->user())) {
+            return response()->json(['message' => "Vous n'avez pas accès à ce dossier."], 403);
+        }
+
         if ($dossier->estArchive()) {
             return response()->json(['message' => 'Ce dossier est archivé : il ne peut plus être modifié.'], 409);
         }
@@ -194,7 +198,6 @@ class DossierController extends Controller
         return response()->json($dossier->load('procureurAssigne'));
     }
 
-    // Avis du procureur sur le dossier, persisté côté serveur.
     // Archivage manuel par le juge qui a présidé une audience du dossier, une
     // fois la décision rendue.
     public function archiver(Request $request, Dossier $dossier)
@@ -216,6 +219,7 @@ class DossierController extends Controller
         return response()->json($dossier->fresh());
     }
 
+    // Avis du procureur sur le dossier, conservé avec son auteur et sa date.
     public function donnerAvis(Request $request, Dossier $dossier)
     {
         if (! $dossier->estAccessiblePar($request->user())) {

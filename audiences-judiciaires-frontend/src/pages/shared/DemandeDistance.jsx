@@ -51,8 +51,8 @@ export default function DemandeDistance() {
       setDemandes((list) => [nouvelle, ...list])
       setOuvertPour(null)
       setMotif('')
-    } catch {
-      setErreur("Impossible d'envoyer la demande.")
+    } catch (err) {
+      setErreur(err.response?.data?.message || "Impossible d'envoyer la demande.")
     } finally {
       setEnCours(false)
     }

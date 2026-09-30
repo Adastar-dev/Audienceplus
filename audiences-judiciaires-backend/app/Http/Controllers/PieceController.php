@@ -70,8 +70,12 @@ class PieceController extends Controller
         return response()->json($piece, 201);
     }
 
-    public function valider(Piece $piece)
+    public function valider(Request $request, Piece $piece)
     {
+        if (! $piece->dossier->estAccessiblePar($request->user())) {
+            return response()->json(['message' => "Vous n'avez pas accès à ce dossier."], 403);
+        }
+
         $piece->update(['valide' => true]);
 
         return response()->json($piece);
@@ -84,10 +88,17 @@ class PieceController extends Controller
         }
 
         $utilisateur = $request->user();
+        // Le dossier doit être accessible (un greffier d'un autre tribunal n'y
+        // touche pas), puis seul le greffe ou l'auteur de la pièce la supprime.
+        if (! $piece->dossier->estAccessiblePar($utilisateur)) {
+            return response()->json(['message' => "Vous n'avez pas accès à ce dossier."], 403);
+        }
         if ($utilisateur->role !== 'GREFFIER' && $piece->depose_par !== $utilisateur->id_utilisateur) {
             return response()->json(['message' => 'Vous ne pouvez supprimer que vos propres pièces.'], 403);
         }
 
+        // Le fichier est effacé avec sa fiche : sinon il resterait sur le disque, orphelin.
+        Storage::disk('local')->delete($piece->chemin);
         $piece->delete();
 
         return response()->json(null, 204);

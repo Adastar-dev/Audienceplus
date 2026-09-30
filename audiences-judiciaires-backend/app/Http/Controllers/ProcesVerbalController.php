@@ -32,8 +32,23 @@ class ProcesVerbalController extends Controller
         return response()->json($pv);
     }
 
+    // Rédaction et transmission par le greffier du tribunal, validation ou rejet
+    // par le juge de l'audience.
+    private function refuserSiPasDeLAudience(Request $request, Audience $audience)
+    {
+        if (! $audience->estGereePar($request->user())) {
+            return response()->json(['message' => "Cette audience ne relève pas de vous."], 403);
+        }
+
+        return null;
+    }
+
     public function storeOrUpdate(Request $request, Audience $audience)
     {
+        if ($refus = $this->refuserSiPasDeLAudience($request, $audience)) {
+            return $refus;
+        }
+
         $validator = Validator::make($request->all(), [
             'contenu' => 'required|string',
         ]);
@@ -50,8 +65,12 @@ class ProcesVerbalController extends Controller
         return response()->json($pv);
     }
 
-    public function transmettre(Audience $audience)
+    public function transmettre(Request $request, Audience $audience)
     {
+        if ($refus = $this->refuserSiPasDeLAudience($request, $audience)) {
+            return $refus;
+        }
+
         $pv = $audience->procesVerbal;
 
         if (! $pv) {
@@ -63,8 +82,12 @@ class ProcesVerbalController extends Controller
         return response()->json($pv);
     }
 
-    public function valider(Audience $audience)
+    public function valider(Request $request, Audience $audience)
     {
+        if ($refus = $this->refuserSiPasDeLAudience($request, $audience)) {
+            return $refus;
+        }
+
         $pv = $audience->procesVerbal;
 
         if (! $pv) {
@@ -78,6 +101,10 @@ class ProcesVerbalController extends Controller
 
     public function rejeter(Request $request, Audience $audience)
     {
+        if ($refus = $this->refuserSiPasDeLAudience($request, $audience)) {
+            return $refus;
+        }
+
         $validator = Validator::make($request->all(), [
             'commentaire' => 'required|string|max:2000',
         ]);
@@ -182,6 +209,10 @@ class ProcesVerbalController extends Controller
 
     public function transcrire(Request $request, Audience $audience)
     {
+        if ($refus = $this->refuserSiPasDeLAudience($request, $audience)) {
+            return $refus;
+        }
+
         $validator = Validator::make($request->all(), [
             'audio' => 'required|file|mimes:mp3,wav,m4a,ogg,webm,mp4|max:25600',
         ]);

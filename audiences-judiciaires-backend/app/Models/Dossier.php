@@ -38,7 +38,7 @@ class Dossier extends Model
     protected $primaryKey = 'id_dossier';
 
     protected $fillable = [
-        'numero', 'type', 'statut', 'parties', 'id_tribunal', 'id_justiciable', 'id_avocat', 'id_procureur', 'date_creation',
+        'numero', 'type', 'statut', 'parties', 'id_tribunal', 'id_procureur', 'date_creation',
         'avis_procureur', 'avis_procureur_par', 'avis_procureur_date', 'date_archivage',
     ];
 

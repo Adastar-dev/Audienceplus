@@ -122,8 +122,12 @@ class AudienceController extends Controller
         }
     }
 
-    public function ouvrir(Audience $audience)
+    public function ouvrir(Request $request, Audience $audience)
     {
+        if ($refus = $this->refuserSiPasLeJuge($request, $audience)) {
+            return $refus;
+        }
+
         $audience->refresh();
 
         if ($audience->statut !== 'PROGRAMMEE') {
@@ -226,8 +230,8 @@ class AudienceController extends Controller
 
     private function definirPresenceJuge(Request $request, Audience $audience, bool $connecte)
     {
-        if ($audience->id_juge && (int) $audience->id_juge !== (int) $request->user()->id_utilisateur) {
-            return response()->json(['message' => "Vous n'êtes pas le juge de cette audience."], 403);
+        if ($refus = $this->refuserSiPasLeJuge($request, $audience)) {
+            return $refus;
         }
 
         if ($connecte && $audience->statut !== 'EN_COURS') {
@@ -254,8 +258,12 @@ class AudienceController extends Controller
             ->first();
     }
 
-    public function fermer(Audience $audience)
+    public function fermer(Request $request, Audience $audience)
     {
+        if ($refus = $this->refuserSiPasLeJuge($request, $audience)) {
+            return $refus;
+        }
+
         $audience->refresh();
 
         if ($audience->statut !== 'EN_COURS') {
@@ -282,6 +290,10 @@ class AudienceController extends Controller
 
     public function decider(Request $request, Audience $audience)
     {
+        if ($refus = $this->refuserSiPasLeJuge($request, $audience)) {
+            return $refus;
+        }
+
         if ($audience->statut !== 'EN_COURS') {
             return response()->json(['message' => "L'audience doit être en cours pour enregistrer une décision."], 409);
         }
@@ -330,10 +342,36 @@ class AudienceController extends Controller
         }
     }
 
-    public function admettreParticipant(Request $request, Audience $audience, ParticipationAudience $participation)
+    // Seul le juge de l'audience (tout juge si aucun n'est désigné) la conduit :
+    // l'ouvrir, décider, la fermer, entrer dans la salle.
+    private function refuserSiPasLeJuge(Request $request, Audience $audience)
+    {
+        if (! $audience->estGereePar($request->user())) {
+            return response()->json(['message' => "Vous n'êtes pas le juge de cette audience."], 403);
+        }
+
+        return null;
+    }
+
+    // Admission depuis la salle d'attente : le juge de l'audience, ou un greffier
+    // du tribunal du dossier.
+    private function refuserSiPasDeLAudience(Request $request, Audience $audience, ParticipationAudience $participation)
     {
         if ((int) $participation->id_audience !== (int) $audience->id_audience) {
             abort(404);
+        }
+
+        if (! $audience->estGereePar($request->user())) {
+            return response()->json(['message' => "Vous n'avez pas accès à cette audience."], 403);
+        }
+
+        return null;
+    }
+
+    public function admettreParticipant(Request $request, Audience $audience, ParticipationAudience $participation)
+    {
+        if ($refus = $this->refuserSiPasDeLAudience($request, $audience, $participation)) {
+            return $refus;
         }
 
         $participation->update(['admis' => true]);
@@ -343,8 +381,8 @@ class AudienceController extends Controller
 
     public function refuserParticipant(Request $request, Audience $audience, ParticipationAudience $participation)
     {
-        if ((int) $participation->id_audience !== (int) $audience->id_audience) {
-            abort(404);
+        if ($refus = $this->refuserSiPasDeLAudience($request, $audience, $participation)) {
+            return $refus;
         }
 
         // Refus : la personne sort de la salle d'attente et devra refaire la

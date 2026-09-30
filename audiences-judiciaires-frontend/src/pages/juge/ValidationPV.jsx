@@ -71,15 +71,17 @@ export default function ValidationPV() {
     }
   }
 
+  // Texte brut (.txt) : le PV validé figure aussi, mis en page, en annexe de la
+  // décision PDF générée par le serveur.
   function handleExporter() {
     const blob = new Blob(
       [`PROCÈS-VERBAL (validé)\n\n${audience.dossier?.parties ?? ''}\n\n${pv.contenu}`],
-      { type: 'application/pdf' },
+      { type: 'text/plain;charset=utf-8' },
     )
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `PV_audience_${id}.pdf`
+    a.download = `PV_audience_${id}.txt`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -200,7 +202,7 @@ export default function ValidationPV() {
             className="flex items-center gap-2 border border-slate-200 text-navy-900 text-sm font-medium rounded px-4 py-2 hover:bg-navy-50 transition-colors"
           >
             <FileDown size={15} />
-            Exporter le PV en PDF
+            Exporter le texte du PV
           </button>
         </div>
       )}

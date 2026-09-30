@@ -33,13 +33,9 @@ function loadJitsiScript(domain) {
 // (voir getJetonJitsi). Sur le Jitsi auto-hébergé, le jeton est obligatoire
 // et c'est lui seul qui fait du juge le modérateur. Sans jwt (backend non
 // configuré), on retombe sur meet.jit.si où le premier arrivé est modérateur.
-//
-// moderator=true (juge) active le "lobby" natif de Jitsi : tout
-// participant suivant doit "frapper" et attendre
-// d'être admis explicitement - c'est le vrai mécanisme d'admission,
-// distinct du champ `admis` stocké en base (qui sert de journal/trace,
-// pas de barrière d'accès réelle).
-export default function JitsiMeetRoom({ domain: domaineAnnonce, roomName, jwt, displayName, moderator = false, onJoined, onLeft, onApiReady }) {
+// L'admission des participants (code OTP puis accord du juge ou du greffier)
+// est contrôlée par le backend avant la délivrance du jeton.
+export default function JitsiMeetRoom({ domain: domaineAnnonce, roomName, jwt, displayName, onJoined, onLeft, onApiReady }) {
   const domain = domaineAccessible(domaineAnnonce)
   const containerRef = useRef(null)
   const apiRef = useRef(null)
@@ -76,8 +72,7 @@ export default function JitsiMeetRoom({ domain: domaineAnnonce, roomName, jwt, d
         })
         apiRef.current = api
 
-        // L'admission des participants se fait dans l'application (greffier ou
-        // juge) avant la délivrance du jeton : pas de salle d'attente Jitsi en plus.
+        // Pas de salle d'attente Jitsi en plus de celle de l'application.
         api.addEventListener('videoConferenceJoined', () => {
           onJoinedRef.current?.()
         })
@@ -94,7 +89,7 @@ export default function JitsiMeetRoom({ domain: domaineAnnonce, roomName, jwt, d
       cancelled = true
       apiRef.current?.dispose()
     }
-  }, [domain, roomName, jwt, displayName, moderator])
+  }, [domain, roomName, jwt, displayName])
 
   if (status === 'error') {
     return (

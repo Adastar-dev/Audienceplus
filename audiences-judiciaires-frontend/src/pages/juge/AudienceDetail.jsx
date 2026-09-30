@@ -18,6 +18,7 @@ export default function AudienceDetail() {
   const [erreur, setErreur] = useState('')
   const [showDecision, setShowDecision] = useState(false)
   const [decision, setDecision] = useState(null)
+  const [motif, setMotif] = useState('')
 
   useEffect(() => {
     Promise.all([getAudienceById(id), getPV(id)])
@@ -40,7 +41,7 @@ export default function AudienceDetail() {
 
   async function enregistrerDecision(type) {
     try {
-      const updated = await cloturerAudience(id, type)
+      const updated = await cloturerAudience(id, type, motif)
       setAudience((a) => ({
         ...a,
         statut: updated.statut,
@@ -157,6 +158,18 @@ export default function AudienceDetail() {
             {decision === 'renvoi' ? 'renvoi' : decision === 'delibere' ? 'mise en délibéré' : 'jugement rendu'}
           </p>
         ) : showDecision ? (
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1.5">
+              Dispositif (repris dans la décision PDF)
+            </label>
+            <textarea
+              value={motif}
+              onChange={(e) => setMotif(e.target.value)}
+              maxLength={2000}
+              rows={4}
+              placeholder="Ex. : Prononce le divorce aux torts partagés ; fixe la pension alimentaire à..."
+              className="w-full border border-slate-200 rounded px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-navy-700"
+            />
           <div className="flex flex-wrap gap-2">
             <button onClick={() => enregistrerDecision('jugement')} className="border border-slate-200 text-sm rounded px-3 py-1.5 hover:bg-slate-50">
               Jugement rendu
@@ -167,6 +180,7 @@ export default function AudienceDetail() {
             <button onClick={() => enregistrerDecision('delibere')} className="border border-slate-200 text-sm rounded px-3 py-1.5 hover:bg-slate-50">
               Mise en délibéré
             </button>
+          </div>
           </div>
         ) : (
           <button

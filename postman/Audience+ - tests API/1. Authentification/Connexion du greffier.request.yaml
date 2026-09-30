@@ -1,0 +1,24 @@
+$kind: http-request
+description: ""
+url: "{{base_url}}/login"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "identifiant": "{{email_greffier}}",
+      "mot_de_passe": "{{mdp_greffier}}"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Connexion acceptée (200)", () => pm.response.to.have.status(200));
+      const r = pm.response.json();
+      pm.test("Un jeton Sanctum est renvoyé", () => pm.expect(r.token).to.be.a("string"));
+      pm.test("Le mot de passe n'est jamais renvoyé", () => pm.expect(r.user).to.not.have.property("mot_de_passe"));
+      pm.collectionVariables.set("token_greffier", r.token);
+    language: text/javascript
+order: 1000

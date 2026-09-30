@@ -1,0 +1,15 @@
+$kind: collection
+description: |-
+  Vérifications de l'API Audience+ : authentification, contrôle d'accès (401 / 403), validation des données (422) et vérification publique des QR codes.
+
+  Avant de lancer : renseigner les variables de la collection (onglet Variables) `mdp_greffier` et `mdp_justiciable`, puis exécuter la collection dans l'ordre (Run collection). La connexion est limitée à 5 essais par minute.
+variables:
+  base_url: http://localhost:8000/api
+  email_greffier: m.sy@justice.sn
+  mdp_greffier: A_RENSEIGNER
+  email_justiciable: adamangompro0@gmail.com
+  mdp_justiciable: A_RENSEIGNER
+  id_dossier_etranger: "3"
+  reference_casier: AJ-CJ-2026-000001-P5CS
+  token_greffier: ""
+  token_justiciable: ""

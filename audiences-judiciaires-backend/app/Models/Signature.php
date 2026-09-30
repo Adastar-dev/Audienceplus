@@ -9,7 +9,7 @@ class Signature extends Model
 
     protected $primaryKey = 'id_signature';
 
-    protected $fillable = ['id_utilisateur', 'type_document', 'id_document_signe', 'hash', 'image_path', 'date_signature'];
+    protected $fillable = ['id_utilisateur', 'type_document', 'id_document_signe', 'hash', 'date_signature'];
 
     protected $casts = [
         'date_signature' => 'datetime',

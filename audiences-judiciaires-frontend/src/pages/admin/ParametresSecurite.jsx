@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { ShieldCheck } from 'lucide-react'
 
+// Valeurs appliquées par le serveur : blocage 15 minutes après 5 échecs
+// (AuthController) et jeton valable 8 heures (config/sanctum.php).
 export default function ParametresSecurite() {
   const [params, setParams] = useState({
     blocageApresEchecs: true,
     nbTentativesMax: 5,
     chiffrementDonnees: true,
-    dureeSessionMinutes: 30,
+    dureeSessionMinutes: 480,
   })
 
   function toggle(field) {

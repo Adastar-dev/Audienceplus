@@ -1,0 +1,15 @@
+$kind: http-request
+description: ""
+url: "{{base_url}}/verification/{{reference_casier}}"
+method: GET
+headers:
+  Accept: application/json
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Référence reconnue (200)", () => pm.response.to.have.status(200));
+      const r = pm.response.json();
+      pm.test("Document authentique", () => pm.expect(r.authentique).to.eql(true));
+      pm.test("Nom du titulaire masqué", () => pm.expect(r.titulaire).to.match(/\*\*\*$/));
+    language: text/javascript
+order: 1000

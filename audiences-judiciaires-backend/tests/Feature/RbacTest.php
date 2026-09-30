@@ -57,6 +57,17 @@ class RbacTest extends TestCase
         $reponse = $this->actingAs($greffier, 'sanctum')->postJson("/api/audiences/{$audience->id_audience}/ouvrir");
 
         $reponse->assertStatus(403);
+
+        // Un autre juge que celui de l'audience ne la conduit pas non plus, et une
+        // personne étrangère au dossier n'en voit pas les participants.
+        $juge = $this->creerUtilisateur('JUGE');
+        $autreJuge = $this->creerUtilisateur('JUGE');
+        $audience->update(['id_juge' => $juge->id_utilisateur]);
+        foreach (['ouvrir', 'fermer', 'decider'] as $action) {
+            $this->actingAs($autreJuge, 'sanctum')->postJson("/api/audiences/{$audience->id_audience}/{$action}", ['type' => 'RENVOI'])->assertStatus(403);
+        }
+        $this->actingAs($this->creerUtilisateur('JUSTICIABLE'), 'sanctum')->getJson("/api/audiences/{$audience->id_audience}/participants")->assertStatus(403);
+        $this->actingAs($juge, 'sanctum')->postJson("/api/audiences/{$audience->id_audience}/ouvrir")->assertOk();
     }
 
     public function test_les_routes_admin_sont_refusees_a_un_non_administrateur(): void

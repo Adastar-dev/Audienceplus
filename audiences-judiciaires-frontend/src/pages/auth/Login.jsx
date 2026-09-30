@@ -30,6 +30,9 @@ export default function Login() {
         setErreur('Identifiants incorrects.')
       } else if (err.response?.status === 429) {
         setErreur('Trop de tentatives. Réessayez dans une minute.')
+      } else if (err.response?.status === 423) {
+        // Compte bloqué 15 minutes après 5 échecs : message du serveur.
+        setErreur(err.response.data?.message ?? 'Compte temporairement bloqué. Réessayez plus tard.')
       } else {
         setErreur("Impossible de se connecter au serveur. Vérifiez que l'API est démarrée.")
       }

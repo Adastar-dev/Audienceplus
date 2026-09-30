@@ -84,7 +84,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/signatures', [SignatureController::class, 'store']);
     Route::get('/signatures/document', [SignatureController::class, 'pourDocument']);
     Route::get('/signatures/verifier', [SignatureController::class, 'verifierIntegrite']);
-    Route::get('/signatures/{signature}/image', [SignatureController::class, 'image']);
 
     Route::get('/convocations', [ConvocationController::class, 'index']);
     Route::post('/convocations/{convocation}/confirmer', [ConvocationController::class, 'confirmer'])

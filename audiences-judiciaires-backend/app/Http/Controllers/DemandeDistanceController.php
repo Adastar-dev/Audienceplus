@@ -69,11 +69,26 @@ class DemandeDistanceController extends Controller
         return response()->json($demande, 201);
     }
 
+    // Avis du greffier (tribunal du dossier) et décision du juge (juge de
+    // l'audience) : réservés à ceux qui gèrent l'audience concernée.
+    private function refuserSiPasDeLAudience(Request $request, DemandeDistance $demande)
+    {
+        if (! $demande->audience->estGereePar($request->user())) {
+            return response()->json(['message' => "Cette audience ne relève pas de vous."], 403);
+        }
+
+        return null;
+    }
+
     // Le greffier ne tranche plus lui-même : il donne un avis, favorable ou
     // défavorable, que le juge devra valider pour que la demande soit
     // réellement approuvée ou refusée.
     public function donnerAvis(Request $request, DemandeDistance $demande)
     {
+        if ($refus = $this->refuserSiPasDeLAudience($request, $demande)) {
+            return $refus;
+        }
+
         $validator = Validator::make($request->all(), [
             'avis' => 'required|in:FAVORABLE,DEFAVORABLE',
             'commentaire' => 'required_if:avis,DEFAVORABLE|nullable|string|max:1000',
@@ -110,6 +125,10 @@ class DemandeDistanceController extends Controller
     // greffier a donné son avis (favorable ou défavorable).
     public function approuver(Request $request, DemandeDistance $demande)
     {
+        if ($refus = $this->refuserSiPasDeLAudience($request, $demande)) {
+            return $refus;
+        }
+
         if (! in_array($demande->statut, ['AVIS_GREFFIER_FAVORABLE', 'AVIS_GREFFIER_DEFAVORABLE'], true)) {
             return response()->json([
                 'message' => "L'avis du greffier est requis avant toute validation par le juge.",
@@ -134,6 +153,10 @@ class DemandeDistanceController extends Controller
 
     public function refuser(Request $request, DemandeDistance $demande)
     {
+        if ($refus = $this->refuserSiPasDeLAudience($request, $demande)) {
+            return $refus;
+        }
+
         $validator = Validator::make($request->all(), [
             'commentaire' => 'required|string|max:1000',
         ]);

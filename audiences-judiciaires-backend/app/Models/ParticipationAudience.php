@@ -12,8 +12,7 @@ class ParticipationAudience extends Model
 
     protected $fillable = [
         'id_audience', 'id_utilisateur', 'role_audience',
-        'micro_actif', 'camera_active', 'cni_photo_path',
-        'numero_cni_detecte', 'numero_cni_concorde', 'present', 'admis',
+        'micro_actif', 'camera_active', 'present', 'admis',
         'otp_code_hash', 'otp_expire_a', 'otp_tentatives', 'identite_confirmee_otp',
     ];
 
@@ -22,7 +21,6 @@ class ParticipationAudience extends Model
     protected $casts = [
         'micro_actif' => 'boolean',
         'camera_active' => 'boolean',
-        'numero_cni_concorde' => 'boolean',
         'present' => 'boolean',
         'admis' => 'boolean',
         'otp_expire_a' => 'datetime',

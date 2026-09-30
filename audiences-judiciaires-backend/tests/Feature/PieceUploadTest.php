@@ -67,4 +67,27 @@ class PieceUploadTest extends TestCase
 
         $reponse->assertStatus(422);
     }
+
+    public function test_la_suppression_efface_le_fichier_et_reste_limitee_au_tribunal(): void
+    {
+        Storage::fake('local');
+        $greffier = $this->creerUtilisateur('GREFFIER');
+        $dossier = $this->dossierDeTest();
+        $greffier->update(['id_tribunal' => $dossier->id_tribunal]);
+        $autreTribunal = $this->tribunal(['nom' => 'Tribunal de Thiès', 'ville' => 'Thiès']);
+        $greffierAilleurs = $this->creerUtilisateur('GREFFIER', ['id_tribunal' => $autreTribunal->id_tribunal]);
+
+        $piece = $this->actingAs($greffier, 'sanctum')
+            ->postJson("/api/dossiers/{$dossier->id_dossier}/pieces", ['fichier' => UploadedFile::fake()->create('piece.pdf', 10, 'application/pdf')])
+            ->assertStatus(201)->json();
+        Storage::disk('local')->assertExists($piece['chemin']);
+
+        $this->actingAs($greffierAilleurs, 'sanctum')->deleteJson("/api/pieces/{$piece['id_piece']}")->assertStatus(403);
+        $this->actingAs($greffierAilleurs, 'sanctum')->postJson("/api/pieces/{$piece['id_piece']}/valider")->assertStatus(403);
+        $this->actingAs($greffierAilleurs, 'sanctum')->patchJson("/api/dossiers/{$dossier->id_dossier}", ['statut' => 'RENVOYE'])->assertStatus(403);
+        $this->actingAs($greffier, 'sanctum')->patchJson("/api/dossiers/{$dossier->id_dossier}", ['statut' => 'RENVOYE'])->assertOk();
+
+        $this->actingAs($greffier, 'sanctum')->deleteJson("/api/pieces/{$piece['id_piece']}")->assertStatus(204);
+        Storage::disk('local')->assertMissing($piece['chemin']);
+    }
 }

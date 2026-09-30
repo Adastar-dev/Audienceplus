@@ -1,0 +1,15 @@
+$kind: http-request
+name: "Greffier : liste des dossiers de son tribunal"
+description: ""
+url: "{{base_url}}/dossiers"
+method: GET
+headers:
+  Accept: application/json
+  Authorization: Bearer {{token_greffier}}
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Accès autorisé (200)", () => pm.response.to.have.status(200));
+      pm.test("Réponse sous forme de liste", () => pm.expect(pm.response.json()).to.be.an("array"));
+    language: text/javascript
+order: 5000

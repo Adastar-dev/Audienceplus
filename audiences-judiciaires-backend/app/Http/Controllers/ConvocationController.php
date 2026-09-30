@@ -71,11 +71,26 @@ class ConvocationController extends Controller
         return response()->json($convocation);
     }
 
+    // Avis du greffier (tribunal du dossier), décision du juge (juge de l'audience)
+    // et relance : réservés à ceux qui gèrent l'audience concernée.
+    private function refuserSiPasDeLAudience(Request $request, Convocation $convocation)
+    {
+        if (! $convocation->audience->estGereePar($request->user())) {
+            return response()->json(['message' => "Cette audience ne relève pas de vous."], 403);
+        }
+
+        return null;
+    }
+
     // Le greffier ne décide plus lui-même du report : il donne un avis, en
     // proposant une nouvelle date s'il est favorable, que le juge devra
     // valider pour que le report soit réellement approuvé ou refusé.
     public function donnerAvisReport(Request $request, Convocation $convocation)
     {
+        if ($refus = $this->refuserSiPasDeLAudience($request, $convocation)) {
+            return $refus;
+        }
+
         $validator = Validator::make($request->all(), [
             'avis' => 'required|in:FAVORABLE,DEFAVORABLE',
             'nouvelle_date_heure' => 'required_if:avis,FAVORABLE|nullable|date',
@@ -115,6 +130,10 @@ class ConvocationController extends Controller
     // le greffier ou en fixer une autre.
     public function approuverReport(Request $request, Convocation $convocation, DisponibiliteJuge $disponibilite)
     {
+        if ($refus = $this->refuserSiPasDeLAudience($request, $convocation)) {
+            return $refus;
+        }
+
         $validator = Validator::make($request->all(), [
             'nouvelle_date_heure' => 'nullable|date',
         ]);
@@ -174,6 +193,10 @@ class ConvocationController extends Controller
 
     public function refuserReport(Request $request, Convocation $convocation)
     {
+        if ($refus = $this->refuserSiPasDeLAudience($request, $convocation)) {
+            return $refus;
+        }
+
         $validator = Validator::make($request->all(), [
             'reponse_greffier' => 'required|string|max:1000',
         ]);
@@ -202,8 +225,12 @@ class ConvocationController extends Controller
         return response()->json($convocation);
     }
 
-    public function relancer(Convocation $convocation)
+    public function relancer(Request $request, Convocation $convocation)
     {
+        if ($refus = $this->refuserSiPasDeLAudience($request, $convocation)) {
+            return $refus;
+        }
+
         $convocation->update(['statut' => 'ENVOYEE', 'date_envoi' => now()]);
         $this->notifications->envoyerRappel($convocation);
 

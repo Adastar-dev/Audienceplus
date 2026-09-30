@@ -15,6 +15,15 @@ export async function enregistrerBrouillon(idAudience, contenu) {
   return data
 }
 
+// Enregistrement audio de l'audience, transcrit par Whisper (API Groq). Si la
+// transcription échoue, l'audio est tout de même conservé par le serveur.
+export async function transcrireAudio(idAudience, fichier) {
+  const formData = new FormData()
+  formData.append('audio', fichier)
+  const { data } = await apiClient.post(`/audiences/${idAudience}/pv/transcrire`, formData)
+  return data
+}
+
 export async function transmettrePV(idAudience) {
   const { data } = await apiClient.post(`/audiences/${idAudience}/pv/transmettre`)
   return data

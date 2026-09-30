@@ -25,15 +25,17 @@ async function deciderAudience(id, type, motif) {
   return data
 }
 
-// Enregistre la décision du juge et sort l'audience de l'état "en cours".
-// Un jugement est d'abord enregistré (type_decision) puis l'audience fermée :
-// c'est la fermeture qui passe le dossier en JUGE et notifie les parties.
-export async function cloturerAudience(id, decision) {
+// Enregistre la décision du juge (et son dispositif, repris dans le PDF) et
+// sort l'audience de l'état "en cours". Un jugement est d'abord enregistré
+// (type_decision) puis l'audience fermée : c'est la fermeture qui passe le
+// dossier en JUGE et notifie les parties.
+export async function cloturerAudience(id, decision, motif) {
+  const texte = motif?.trim() || null
   if (decision === 'jugement') {
-    await deciderAudience(id, 'JUGEMENT')
+    await deciderAudience(id, 'JUGEMENT', texte)
     return fermerAudience(id)
   }
-  return deciderAudience(id, decision === 'renvoi' ? 'RENVOI' : 'DELIBERE')
+  return deciderAudience(id, decision === 'renvoi' ? 'RENVOI' : 'DELIBERE', texte)
 }
 
 export async function creerAudience(payload) {

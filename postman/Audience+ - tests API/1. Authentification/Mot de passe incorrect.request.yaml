@@ -1,0 +1,21 @@
+$kind: http-request
+description: Compte aussi dans les 5 échecs qui bloquent le compte 15 minutes.
+url: "{{base_url}}/login"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "identifiant": "{{email_greffier}}",
+      "mot_de_passe": "mauvais-mot-de-passe"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Identifiants refusés (401)", () => pm.response.to.have.status(401));
+      pm.test("Aucun jeton délivré", () => pm.expect(pm.response.json()).to.not.have.property("token"));
+    language: text/javascript
+order: 3000

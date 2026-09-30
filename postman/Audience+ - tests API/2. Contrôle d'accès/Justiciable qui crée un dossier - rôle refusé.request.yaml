@@ -1,0 +1,20 @@
+$kind: http-request
+name: "Justiciable qui crée un dossier : rôle refusé"
+description: ""
+url: "{{base_url}}/dossiers"
+method: POST
+headers:
+  Accept: application/json
+  Authorization: Bearer {{token_justiciable}}
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "type": "DIVORCE"
+    }
+scripts:
+  - type: afterResponse
+    code: pm.test("Rôle non autorisé refusé par EnsureRole (403)", () => pm.response.to.have.status(403));
+    language: text/javascript
+order: 2000

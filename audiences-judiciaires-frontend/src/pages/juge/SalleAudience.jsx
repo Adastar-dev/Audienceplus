@@ -21,6 +21,7 @@ export default function SalleAudience() {
   const [avertissement, setAvertissement] = useState('')
   const [jeton, setJeton] = useState(null)
   const [choixDecision, setChoixDecision] = useState(false)
+  const [motif, setMotif] = useState('')
   const [cloture, setCloture] = useState(false)
   const jitsiApiRef = useRef(null)
 
@@ -44,8 +45,7 @@ export default function SalleAudience() {
   }, [id])
 
   // Les participants n'obtiennent de jeton Jitsi qu'une fois ce signal reçu :
-  // le juge est alors déjà dans la conférence (modérateur via son jeton) et a
-  // activé la salle d'attente.
+  // le juge est alors déjà dans la conférence, modérateur via son jeton.
   const handleJoined = useCallback(() => {
     signalerJugeConnecte(id)
       .then(() => setAvertissement(''))
@@ -96,7 +96,7 @@ export default function SalleAudience() {
   async function fermerAvecDecision(type) {
     setCloture(true)
     try {
-      await cloturerAudience(id, type)
+      await cloturerAudience(id, type, motif)
       try {
         jitsiApiRef.current?.executeCommand('endConference')
       } catch {
@@ -144,7 +144,13 @@ export default function SalleAudience() {
 
         {choixDecision ? (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-navy-100 hidden sm:inline">Décision :</span>
+            <input
+              value={motif}
+              onChange={(e) => setMotif(e.target.value)}
+              maxLength={2000}
+              placeholder="Dispositif (facultatif)"
+              className="w-56 bg-navy-900 border border-navy-700 rounded px-2 py-1.5 text-sm text-white placeholder:text-navy-100 focus:outline-none"
+            />
             {[
               ['jugement', 'Jugement rendu'],
               ['renvoi', 'Renvoi'],
@@ -185,7 +191,6 @@ export default function SalleAudience() {
             roomName={jeton.salle}
             jwt={jeton.jwt}
             displayName={user?.nom ?? 'Juge'}
-            moderator
             onJoined={handleJoined}
             onApiReady={(api) => {
               jitsiApiRef.current = api

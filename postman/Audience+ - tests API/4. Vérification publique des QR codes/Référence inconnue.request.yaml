@@ -1,0 +1,13 @@
+$kind: http-request
+description: ""
+url: "{{base_url}}/verification/AJ-CJ-2026-999999-ZZZZ"
+method: GET
+headers:
+  Accept: application/json
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Référence inconnue (404)", () => pm.response.to.have.status(404));
+      pm.test("Document non authentifié", () => pm.expect(pm.response.json().authentique).to.eql(false));
+    language: text/javascript
+order: 2000

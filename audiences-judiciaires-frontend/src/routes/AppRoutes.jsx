@@ -112,9 +112,6 @@ export default function AppRoutes() {
         <Route path="/greffier/audiences/:id/rejoindre" element={<RejoindreAudience backTo="/greffier" />} />
       </Route>
 
-      {/* Première connexion d'un compte créé par l'administrateur (hors garde CNI). */}
-      <Route path="/completer-identite" element={<Navigate to="/compte" replace />} />
-
       {/* Espace « Mon compte », commun à tous les rôles. */}
       <Route element={<ProtectedRoute />}>
         <Route element={<DashboardLayout />}>

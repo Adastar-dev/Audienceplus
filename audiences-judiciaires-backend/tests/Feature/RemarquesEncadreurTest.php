@@ -90,6 +90,11 @@ class RemarquesEncadreurTest extends TestCase
             'canal' => 'EMAIL', 'statut' => 'CONFIRMEE', 'date_envoi' => now(),
         ]);
 
+        // Un autre juge ne tranche pas un report qui concerne l'audience d'un collègue.
+        $this->actingAs($this->creerUtilisateur('JUGE'), 'sanctum')
+            ->postJson("/api/convocations/{$convocation->id_convocation}/approuver-report")
+            ->assertStatus(403);
+
         $this->actingAs($juge, 'sanctum')
             ->postJson("/api/convocations/{$convocation->id_convocation}/approuver-report")
             ->assertOk();

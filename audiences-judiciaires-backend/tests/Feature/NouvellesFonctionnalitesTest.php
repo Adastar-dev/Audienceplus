@@ -296,30 +296,7 @@ class NouvellesFonctionnalitesTest extends TestCase
             ->assertOk();
     }
 
-    public function test_la_signature_avec_image_ne_change_pas_le_hash_dintegrite(): void
-    {
-        Storage::fake('local');
-        $juge = $this->creerUtilisateur('JUGE');
-        $audience = $this->audienceDeTest();
-        $pv = ProcesVerbal::create([
-            'id_audience' => $audience->id_audience, 'contenu' => 'Contenu du PV.', 'statut' => 'EN_VALIDATION',
-        ]);
-        $image = UploadedFile::fake()->image('signature.png', 300, 100);
-
-        $reponse = $this->actingAs($juge, 'sanctum')->postJson('/api/signatures', [
-            'type_document' => 'PROCES_VERBAL',
-            'id_document_signe' => $pv->id_pv,
-            'signature_image' => $image,
-        ]);
-
-        $reponse->assertStatus(201);
-        $this->assertNotNull($reponse->json('image_path'));
-
-        $hashAttendu = hash('sha256', 'Contenu du PV.');
-        $this->assertEquals($hashAttendu, $reponse->json('hash'));
-    }
-
-    public function test_la_signature_sans_image_fonctionne_toujours(): void
+    public function test_la_signature_scelle_le_contenu_du_pv_par_son_empreinte(): void
     {
         $juge = $this->creerUtilisateur('JUGE');
         $audience = $this->audienceDeTest();
@@ -333,28 +310,6 @@ class NouvellesFonctionnalitesTest extends TestCase
         ]);
 
         $reponse->assertStatus(201);
-        $this->assertNull($reponse->json('image_path'));
-    }
-
-    public function test_limage_de_signature_est_accessible_via_sa_route_dediee(): void
-    {
-        Storage::fake('local');
-        $juge = $this->creerUtilisateur('JUGE');
-        $audience = $this->audienceDeTest();
-        $pv = ProcesVerbal::create([
-            'id_audience' => $audience->id_audience, 'contenu' => 'Contenu du PV.', 'statut' => 'EN_VALIDATION',
-        ]);
-        $image = UploadedFile::fake()->image('signature.png', 300, 100);
-
-        $creation = $this->actingAs($juge, 'sanctum')->postJson('/api/signatures', [
-            'type_document' => 'PROCES_VERBAL',
-            'id_document_signe' => $pv->id_pv,
-            'signature_image' => $image,
-        ]);
-        $idSignature = $creation->json('id_signature');
-
-        $reponse = $this->actingAs($juge, 'sanctum')->get("/api/signatures/{$idSignature}/image");
-
-        $reponse->assertOk();
+        $this->assertEquals(hash('sha256', 'Contenu du PV.'), $reponse->json('hash'));
     }
 }
