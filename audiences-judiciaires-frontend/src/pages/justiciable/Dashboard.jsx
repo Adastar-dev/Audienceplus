@@ -20,7 +20,11 @@ export default function JusticiableDashboard() {
       .finally(() => setChargement(false))
   }, [])
 
-  const convocation = convocations[0]
+  // La convocation de la prochaine audience encore programmée (une audience
+  // passée ne se confirme ni ne se reporte plus).
+  const convocation = convocations
+    .filter((c) => c.audience?.statut === 'PROGRAMMEE' && new Date(c.audience.date_heure) > new Date())
+    .sort((a, b) => a.audience.date_heure.localeCompare(b.audience.date_heure))[0]
 
   async function handleConfirmer() {
     setEnCours(true)
@@ -65,7 +69,7 @@ export default function JusticiableDashboard() {
       {erreur && <p className="bg-danger-100 text-danger-700 text-sm rounded px-3 py-2 mt-4">{erreur}</p>}
 
       {!convocation ? (
-        <p className="text-sm text-slate-400 mt-6">Aucune convocation pour le moment.</p>
+        <p className="text-sm text-slate-400 mt-6">Aucune audience à venir pour le moment.</p>
       ) : (
         <div className="mt-6 bg-white border border-slate-200 rounded-md p-6">
           <div className="flex items-start justify-between mb-4">
@@ -84,7 +88,7 @@ export default function JusticiableDashboard() {
             <ConvocationStatusBadge statut={convocation.statut} />
           </div>
 
-          {convocation.statut === StatutConvocation.ENVOYEE &&
+          {[StatutConvocation.ENVOYEE, StatutConvocation.REPORT_REFUSEE].includes(convocation.statut) &&
             !showReportForm && (
               <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
                 <button

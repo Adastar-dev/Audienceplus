@@ -109,7 +109,7 @@ export default function Convocations() {
                 </div>
                 <div className="flex items-center gap-3">
                   <ConvocationStatusBadge statut={c.statut} />
-                  {c.statut === StatutConvocation.ENVOYEE && (
+                  {c.statut === StatutConvocation.ENVOYEE && c.audience?.statut === 'PROGRAMMEE' && (
                     <button
                       onClick={() => handleRelancer(c.id_convocation)}
                       disabled={enCours}
@@ -138,6 +138,7 @@ export default function Convocations() {
                     </label>
                     <input
                       type="datetime-local"
+                      min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
                       value={nouvelleDate}
                       onChange={(e) => setNouvelleDate(e.target.value)}
                       className="border border-slate-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-700"

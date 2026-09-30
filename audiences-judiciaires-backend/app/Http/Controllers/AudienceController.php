@@ -14,6 +14,7 @@ use App\Services\NotificationDispatcher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use App\Support\Messages;
 
 class AudienceController extends Controller
@@ -56,7 +57,7 @@ class AudienceController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'id_dossier' => 'required|exists:dossiers,id_dossier',
-            'id_juge' => 'nullable|exists:utilisateurs,id_utilisateur',
+            'id_juge' => ['nullable', Rule::exists('utilisateurs', 'id_utilisateur')->where('role', 'JUGE')],
             'date_heure' => 'required|date|after:now',
             // Une audience est toujours programmee en presentiel : l'acces a distance
             // passe par une demande du justiciable (DemandeDistanceController).
@@ -67,7 +68,12 @@ class AudienceController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        if (Dossier::find($request->id_dossier)->estArchive()) {
+        $dossier = Dossier::find($request->id_dossier);
+        if (! $dossier->estAccessiblePar($request->user())) {
+            return response()->json(['message' => "Ce dossier ne relève pas de votre tribunal."], 403);
+        }
+
+        if ($dossier->estArchive()) {
             return response()->json(['message' => 'Ce dossier est archivé : aucune audience ne peut y être programmée.'], 409);
         }
 

@@ -52,6 +52,14 @@ class DemandeDistanceController extends Controller
             return response()->json(['message' => "Cette audience n'accepte plus de demande de comparution à distance."], 422);
         }
 
+        $dejaDemandee = DemandeDistance::where('id_audience', $audience->id_audience)
+            ->where('id_utilisateur', $request->user()->id_utilisateur)
+            ->where('statut', '!=', 'REFUSEE')
+            ->exists();
+        if ($dejaDemandee) {
+            return response()->json(['message' => 'Vous avez déjà une demande en cours ou accordée pour cette audience.'], 422);
+        }
+
         $demande = DemandeDistance::create([
             'id_audience' => $request->id_audience,
             'id_utilisateur' => $request->user()->id_utilisateur,
@@ -75,6 +83,10 @@ class DemandeDistanceController extends Controller
     {
         if (! $demande->audience->estGereePar($request->user())) {
             return response()->json(['message' => "Cette audience ne relève pas de vous."], 403);
+        }
+
+        if ($demande->audience->statut !== 'PROGRAMMEE') {
+            return response()->json(['message' => "Cette audience a déjà eu lieu ou n'est plus programmée."], 409);
         }
 
         return null;

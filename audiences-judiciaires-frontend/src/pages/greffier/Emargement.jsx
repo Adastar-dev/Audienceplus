@@ -116,6 +116,9 @@ export default function Emargement() {
     )
   }
 
+  // Même règle que le serveur : émargement figé une fois l'audience terminée.
+  const audienceTerminee = !['PROGRAMMEE', 'EN_COURS'].includes(audience.statut)
+
   return (
     <div>
       <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-sm text-slate-600 hover:text-navy-900 mb-4">
@@ -159,14 +162,14 @@ export default function Emargement() {
                 <div className="flex gap-2 mt-1.5">
                   <button
                     onClick={() => handleAdmission(p.id_participation, true)}
-                    disabled={enCours === p.id_participation}
+                    disabled={enCours === p.id_participation || audienceTerminee}
                     className="text-xs font-medium text-success-700 hover:underline disabled:opacity-40"
                   >
                     Faire entrer dans la salle
                   </button>
                   <button
                     onClick={() => handleAdmission(p.id_participation, false)}
-                    disabled={enCours === p.id_participation}
+                    disabled={enCours === p.id_participation || audienceTerminee}
                     className="text-xs text-danger-700 hover:underline disabled:opacity-40"
                   >
                     Refuser
@@ -185,7 +188,7 @@ export default function Emargement() {
                 </span>
                 <button
                   onClick={() => handleMarquerAbsent(p.id_participation)}
-                  disabled={enCours === p.id_participation}
+                  disabled={enCours === p.id_participation || audienceTerminee}
                   className="flex items-center gap-1 text-xs text-slate-400 hover:text-danger-700 disabled:opacity-40"
                 >
                   <Undo2 size={12} />
@@ -195,7 +198,7 @@ export default function Emargement() {
             ) : (
               <button
                 onClick={() => handleMarquerPresent(p.id_participation)}
-                disabled={enCours === p.id_participation}
+                disabled={enCours === p.id_participation || audienceTerminee}
                 className="flex items-center gap-1.5 bg-navy-900 text-white text-xs font-medium rounded px-3 py-1.5 hover:bg-navy-800 disabled:opacity-60 transition-colors"
               >
                 <PenLine size={13} />

@@ -32,10 +32,25 @@ class ConvocationController extends Controller
         return response()->json($query->latest('date_envoi')->get());
     }
 
+    // Répondre à une convocation, ou déplacer l'audience, n'a de sens que pour
+    // une audience encore à venir.
+    private function refuserSiAudienceNonProgrammee(Convocation $convocation)
+    {
+        if ($convocation->audience->statut !== 'PROGRAMMEE') {
+            return response()->json(['message' => "Cette audience a déjà eu lieu ou n'est plus programmée."], 409);
+        }
+
+        return null;
+    }
+
     public function confirmer(Request $request, Convocation $convocation)
     {
         if ($convocation->id_utilisateur !== $request->user()->id_utilisateur) {
             return response()->json(['message' => "Cette convocation ne vous appartient pas."], 403);
+        }
+
+        if ($refus = $this->refuserSiAudienceNonProgrammee($convocation)) {
+            return $refus;
         }
 
         $convocation->update(['statut' => 'CONFIRMEE']);
@@ -47,6 +62,14 @@ class ConvocationController extends Controller
     {
         if ($convocation->id_utilisateur !== $request->user()->id_utilisateur) {
             return response()->json(['message' => "Cette convocation ne vous appartient pas."], 403);
+        }
+
+        if ($refus = $this->refuserSiAudienceNonProgrammee($convocation)) {
+            return $refus;
+        }
+
+        if (in_array($convocation->statut, ['REPORT_DEMANDE', 'AVIS_GREFFIER_FAVORABLE', 'AVIS_GREFFIER_DEFAVORABLE'], true)) {
+            return response()->json(['message' => 'Une demande de report est déjà en cours pour cette convocation.'], 409);
         }
 
         $validator = Validator::make($request->all(), [
@@ -93,7 +116,7 @@ class ConvocationController extends Controller
 
         $validator = Validator::make($request->all(), [
             'avis' => 'required|in:FAVORABLE,DEFAVORABLE',
-            'nouvelle_date_heure' => 'required_if:avis,FAVORABLE|nullable|date',
+            'nouvelle_date_heure' => 'required_if:avis,FAVORABLE|nullable|date|after:now',
             'reponse_greffier' => 'required_if:avis,DEFAVORABLE|nullable|string|max:1000',
         ]);
 
@@ -135,7 +158,7 @@ class ConvocationController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'nouvelle_date_heure' => 'nullable|date',
+            'nouvelle_date_heure' => 'nullable|date|after:now',
         ]);
 
         if ($validator->fails()) {
@@ -148,7 +171,16 @@ class ConvocationController extends Controller
             ], 422);
         }
 
+        if ($refus = $this->refuserSiAudienceNonProgrammee($convocation)) {
+            return $refus;
+        }
+
         $nouvelleDate = $request->nouvelle_date_heure ?? $convocation->nouvelle_date_proposee;
+        if ($nouvelleDate && Carbon::parse($nouvelleDate)->isPast()) {
+            return response()->json([
+                'errors' => ['nouvelle_date_heure' => ['La date proposée par le greffier est déjà passée ; précisez-en une nouvelle.']],
+            ], 422);
+        }
         if (! $nouvelleDate) {
             return response()->json([
                 'errors' => ['nouvelle_date_heure' => ['Aucune nouvelle date proposée par le greffier ; précisez-en une.']],
@@ -228,6 +260,10 @@ class ConvocationController extends Controller
     public function relancer(Request $request, Convocation $convocation)
     {
         if ($refus = $this->refuserSiPasDeLAudience($request, $convocation)) {
+            return $refus;
+        }
+
+        if ($refus = $this->refuserSiAudienceNonProgrammee($convocation)) {
             return $refus;
         }
 

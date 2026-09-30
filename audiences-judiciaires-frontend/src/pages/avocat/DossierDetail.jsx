@@ -28,7 +28,11 @@ export default function DossierDetailAvocat() {
       .then(([d, p, audiences, convocations]) => {
         setDossier(d)
         setPieces(p)
-        const aud = audiences.find((a) => a.id_dossier === Number(id))
+        // Prochaine audience encore programmée du dossier : c'est elle qu'un
+        // report peut déplacer (pas une audience déjà tenue).
+        const aud = audiences
+          .filter((a) => a.id_dossier === Number(id) && a.statut === 'PROGRAMMEE' && new Date(a.date_heure) > new Date())
+          .sort((a, b) => a.date_heure.localeCompare(b.date_heure))[0]
         setAudienceLiee(aud ?? null)
         // Audience à rejoindre : à venir ou en cours, avec une salle virtuelle
         // (audience en ligne ou comparution à distance accordée).
@@ -123,7 +127,7 @@ export default function DossierDetailAvocat() {
         </ul>
       </div>
 
-      {convocationLiee && (
+      {convocationLiee && !['REPORT_DEMANDE', 'AVIS_GREFFIER_FAVORABLE', 'AVIS_GREFFIER_DEFAVORABLE'].includes(convocationLiee.statut) && (
         <div className="bg-white border border-slate-200 rounded-md p-5">
           <h2 className="font-medium text-navy-900 mb-3">Demander un report</h2>
           {reportEnvoye ? (

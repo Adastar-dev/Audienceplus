@@ -71,6 +71,7 @@ class ControleAccesRegressionTest extends TestCase
     {
         $justiciable = $this->creerUtilisateur('JUSTICIABLE');
         $audience = $this->audienceDeTest();
+        $audience->update(['statut' => 'PROGRAMMEE', 'date_heure' => now()->addDays(2)]);
         $convocation = Convocation::create([
             'id_audience' => $audience->id_audience, 'id_utilisateur' => $justiciable->id_utilisateur,
             'canal' => 'EMAIL', 'statut' => 'ENVOYEE',
@@ -81,6 +82,13 @@ class ControleAccesRegressionTest extends TestCase
 
         $reponse->assertOk();
         $this->assertEquals('CONFIRMEE', $convocation->fresh()->statut);
+
+        // Une fois l'audience tenue, la convocation ne se confirme ni ne se reporte plus.
+        $audience->update(['statut' => 'CLOTUREE']);
+        $this->actingAs($justiciable, 'sanctum')->postJson("/api/convocations/{$convocation->id_convocation}/confirmer")->assertStatus(409);
+        $this->actingAs($justiciable, 'sanctum')
+            ->postJson("/api/convocations/{$convocation->id_convocation}/demander-report", ['motif_report' => 'Empêchement'])
+            ->assertStatus(409);
     }
 
     public function test_transmettre_sans_pv_renvoie_une_erreur_propre_plutot_quun_crash(): void
@@ -103,6 +111,16 @@ class ControleAccesRegressionTest extends TestCase
             ->postJson("/api/audiences/{$audience->id_audience}/pv/valider");
 
         $reponse->assertStatus(404);
+
+        // Cycle du PV : pas de validation avant transmission, pas de
+        // modification une fois validé.
+        $greffier = $this->creerUtilisateur('GREFFIER');
+        $pv = \App\Models\ProcesVerbal::create(['id_audience' => $audience->id_audience, 'contenu' => 'Brouillon', 'statut' => 'EN_COURS']);
+        $this->actingAs($juge, 'sanctum')->postJson("/api/audiences/{$audience->id_audience}/pv/valider")->assertStatus(409);
+        $pv->update(['statut' => 'CLOTURE']);
+        $this->actingAs($greffier, 'sanctum')->putJson("/api/audiences/{$audience->id_audience}/pv", ['contenu' => 'Réécrit'])->assertStatus(409);
+        $this->actingAs($greffier, 'sanctum')->postJson("/api/audiences/{$audience->id_audience}/pv/transmettre")->assertStatus(409);
+        $this->assertEquals('Brouillon', $pv->fresh()->contenu);
     }
 
     public function test_rejeter_sans_pv_renvoie_une_erreur_propre_plutot_quun_crash(): void

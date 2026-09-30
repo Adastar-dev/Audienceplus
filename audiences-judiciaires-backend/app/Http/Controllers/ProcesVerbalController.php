@@ -43,6 +43,21 @@ class ProcesVerbalController extends Controller
         return null;
     }
 
+    // Le greffier ne modifie le PV que tant qu'il est en rédaction : une fois
+    // transmis au juge, validé (et scellé) ou contesté, il est figé.
+    private function refuserSiNonModifiable(?ProcesVerbal $pv)
+    {
+        if ($pv && $pv->statut !== 'EN_COURS') {
+            return response()->json([
+                'message' => $pv->statut === 'EN_VALIDATION'
+                    ? 'Le procès-verbal est en cours de validation par le juge : il ne peut plus être modifié.'
+                    : 'Le procès-verbal a été validé : il ne peut plus être modifié.',
+            ], 409);
+        }
+
+        return null;
+    }
+
     public function storeOrUpdate(Request $request, Audience $audience)
     {
         if ($refus = $this->refuserSiPasDeLAudience($request, $audience)) {
@@ -55,6 +70,10 @@ class ProcesVerbalController extends Controller
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        if ($refus = $this->refuserSiNonModifiable($audience->procesVerbal)) {
+            return $refus;
         }
 
         $pv = ProcesVerbal::updateOrCreate(
@@ -77,6 +96,14 @@ class ProcesVerbalController extends Controller
             return response()->json(['message' => 'Aucun PV rédigé pour cette audience.'], 404);
         }
 
+        if ($refus = $this->refuserSiNonModifiable($pv)) {
+            return $refus;
+        }
+
+        if (! trim((string) $pv->contenu)) {
+            return response()->json(['message' => 'Le procès-verbal est vide : rédigez-le avant de le transmettre.'], 422);
+        }
+
         $pv->update(['statut' => 'EN_VALIDATION', 'commentaire_rejet' => null]);
 
         return response()->json($pv);
@@ -92,6 +119,10 @@ class ProcesVerbalController extends Controller
 
         if (! $pv) {
             return response()->json(['message' => 'Aucun PV rédigé pour cette audience.'], 404);
+        }
+
+        if ($pv->statut !== 'EN_VALIDATION') {
+            return response()->json(['message' => "Seul un procès-verbal transmis par le greffier peut être validé."], 409);
         }
 
         $pv->update(['statut' => 'CLOTURE', 'date_validation' => now()]);
@@ -117,6 +148,10 @@ class ProcesVerbalController extends Controller
 
         if (! $pv) {
             return response()->json(['message' => 'Aucun PV rédigé pour cette audience.'], 404);
+        }
+
+        if ($pv->statut !== 'EN_VALIDATION') {
+            return response()->json(['message' => "Seul un procès-verbal transmis par le greffier peut être renvoyé."], 409);
         }
 
         $pv->update(['statut' => 'EN_COURS', 'commentaire_rejet' => $request->commentaire]);
@@ -219,6 +254,10 @@ class ProcesVerbalController extends Controller
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        if ($refus = $this->refuserSiNonModifiable($audience->procesVerbal)) {
+            return $refus;
         }
 
         $mime = $request->file('audio')->getMimeType();

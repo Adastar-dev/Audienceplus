@@ -61,6 +61,10 @@ class ParticipationController extends Controller
             return response()->json(['message' => "Vous n'avez pas accès à cette audience."], 403);
         }
 
+        if (! in_array($audience->statut, ['PROGRAMMEE', 'EN_COURS'], true)) {
+            return response()->json(['message' => "L'audience est terminée : l'émargement ne peut plus être modifié."], 409);
+        }
+
         return null;
     }
 

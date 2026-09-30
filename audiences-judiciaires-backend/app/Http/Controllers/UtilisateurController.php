@@ -77,6 +77,7 @@ class UtilisateurController extends Controller
             'telephone' => ['sometimes', 'nullable', 'string', Telephone::REGLE, 'unique:utilisateurs,telephone,'.$utilisateur->id_utilisateur.',id_utilisateur'],
             'cni' => ['sometimes', 'nullable', 'string', 'regex:/^[0-9]{10,13}$/', 'unique:utilisateurs,cni,'.$utilisateur->id_utilisateur.',id_utilisateur'],
             'numero_barreau' => 'sometimes|nullable|string|max:50',
+            'id_tribunal' => 'sometimes|nullable|exists:tribunaux,id_tribunal',
         ], [
             'cni.regex' => "Le numéro de CNI doit être composé de 10 à 13 chiffres.",
             'telephone.regex' => Telephone::MESSAGE,

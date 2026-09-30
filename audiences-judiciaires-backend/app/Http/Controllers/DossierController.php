@@ -18,6 +18,13 @@ class DossierController extends Controller
     {
     }
 
+    // L'identifiant doit désigner un compte ayant réellement ce rôle (un
+    // justiciable ne peut pas être désigné comme procureur, etc.).
+    private static function compteDeRole(string $role)
+    {
+        return Rule::exists('utilisateurs', 'id_utilisateur')->where('role', $role);
+    }
+
     public function index(Request $request)
     {
         $user = $request->user();
@@ -53,15 +60,20 @@ class DossierController extends Controller
             'id_tribunal' => 'required|exists:tribunaux,id_tribunal',
             'demandeur' => 'required|string|max:255',
             'defendeur' => [Rule::requiredIf(Dossier::aUnDefendeur((string) $request->type)), 'nullable', 'string', 'max:255'],
-            'id_demandeur_utilisateur' => 'nullable|exists:utilisateurs,id_utilisateur',
-            'id_demandeur_avocat' => 'nullable|exists:utilisateurs,id_utilisateur',
-            'id_defendeur_utilisateur' => 'nullable|exists:utilisateurs,id_utilisateur',
-            'id_defendeur_avocat' => 'nullable|exists:utilisateurs,id_utilisateur',
-            'id_procureur' => 'nullable|exists:utilisateurs,id_utilisateur',
+            'id_demandeur_utilisateur' => ['nullable', self::compteDeRole('JUSTICIABLE')],
+            'id_demandeur_avocat' => ['nullable', self::compteDeRole('AVOCAT')],
+            'id_defendeur_utilisateur' => ['nullable', self::compteDeRole('JUSTICIABLE')],
+            'id_defendeur_avocat' => ['nullable', self::compteDeRole('AVOCAT')],
+            'id_procureur' => ['nullable', self::compteDeRole('PROCUREUR')],
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $greffier = $request->user();
+        if ($greffier->id_tribunal && (int) $request->id_tribunal !== (int) $greffier->id_tribunal) {
+            return response()->json(['errors' => ['id_tribunal' => ["Vous ne pouvez enregistrer un dossier que pour votre tribunal."]]], 403);
         }
 
         $avecDefendeur = Dossier::aUnDefendeur($request->type);
@@ -175,7 +187,7 @@ class DossierController extends Controller
 
         $validator = Validator::make($request->all(), [
             'statut' => 'sometimes|in:EN_COURS,RENVOYE,JUGE,CLOTURE',
-            'id_procureur' => 'sometimes|nullable|exists:utilisateurs,id_utilisateur',
+            'id_procureur' => ['sometimes', 'nullable', self::compteDeRole('PROCUREUR')],
         ]);
 
         if ($validator->fails()) {
