@@ -119,7 +119,9 @@ export default function ValidationPV() {
       </button>
 
       <div className="flex items-center justify-between mb-1">
-        <h1 className="font-display text-2xl text-navy-900">Procès-verbal à valider</h1>
+        <h1 className="font-display text-2xl text-navy-900">
+          {pv.statut === StatutPV.EN_VALIDATION ? 'Procès-verbal à valider' : 'Procès-verbal'}
+        </h1>
         <PVStatusBadge statut={pv.statut} />
       </div>
       <p className="text-sm text-slate-600 mb-6">{audience.dossier?.parties}</p>
@@ -132,7 +134,7 @@ export default function ValidationPV() {
 
       {signatures.length > 0 && (
         <div className="mt-4 bg-navy-50 border border-navy-100 rounded-md p-4 text-sm">
-          <p className="text-navy-900 font-medium mb-1">Signé électroniquement par :</p>
+          <p className="text-navy-900 font-medium mb-1">Scellé (empreinte SHA-256) par :</p>
           <ul className="text-slate-600 space-y-0.5">
             {signatures.map((s) => (
               <li key={s.id_signature}>

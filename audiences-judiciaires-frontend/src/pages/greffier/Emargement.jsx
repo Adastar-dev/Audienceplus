@@ -128,7 +128,7 @@ export default function Emargement() {
       <h1 className="font-display text-2xl text-navy-900">Présence et émargement</h1>
       <p className="text-sm text-slate-600 mt-1">{audience.dossier?.parties} — {audience.dossier?.numero}</p>
       <p className="text-xs text-slate-400 mt-1">
-        Marquer un participant présent génère une signature électronique d'attestation.
+        Marquer un participant présent scelle sa présence (empreinte SHA-256, avec l'heure et le nom du greffier).
       </p>
 
       {audience.statut === 'EN_COURS' && audience.salle_virtuelle && (
