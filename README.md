@@ -11,15 +11,6 @@ Plateforme de gestion d'audiences judiciaires et d'état civil à distance pour 
 
 Audience+ permet la programmation, la tenue et le suivi d'audiences (à distance ou en présentiel), la gestion des dossiers judiciaires, la rédaction et la signature électronique des procès-verbaux, ainsi que la communication (email, notifications, messagerie interne) entre les différents acteurs de la chaîne judiciaire.
 
-## Captures d'écran
-
-| Tableau de bord du juge | Salle d'attente et vérification OTP |
-|---|---|
-| ![Tableau de bord du juge](docs/captures/dashboard-juge.png) | ![Salle d'attente](docs/captures/salle-attente.png) |
-
-| Audience en visioconférence | Procès-verbal et transcription |
-|---|---|
-| ![Audience Jitsi](docs/captures/audience-jitsi.png) | ![Procès-verbal](docs/captures/proces-verbal.png) |
 
 ## Sommaire
 
