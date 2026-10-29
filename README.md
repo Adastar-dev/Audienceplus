@@ -1,11 +1,29 @@
 # Audience+
 
+> Projet de fin d'études soutenu avec la note de **16/20**, mention très bien (ESMT, Licence Télécommunications et Informatique, 2026).
+> Réalisé par **Adama NGOM** · [Portfolio](https://adastar-dev.github.io/adama-ngom-portfolio/) · [LinkedIn](https://www.linkedin.com/in/adama-ngom-4b11282a2/)
+
+**En bref** : une plateforme web qui permet de tenir des audiences d'état civil à distance au Sénégal. Le juge préside en visioconférence Jitsi auto-hébergée, chaque partie confirme son identité par code OTP dans une salle d'attente, et l'enregistrement de l'audience est transcrit par IA (Whisper) pour préparer le procès-verbal.
+
+**Stack** : React · Vite · Tailwind · Laravel · Sanctum · MySQL · Jitsi Meet (JWT) · Whisper via l'API Groq · Docker · 170 tests automatisés
+
 Plateforme de gestion d'audiences judiciaires et d'état civil à distance pour le Sénégal, développée dans le cadre d'un mémoire de fin d'études (ESMT DAR26/LPTI).
 
 Audience+ permet la programmation, la tenue et le suivi d'audiences (à distance ou en présentiel), la gestion des dossiers judiciaires, la rédaction et la signature électronique des procès-verbaux, ainsi que la communication (email, notifications, messagerie interne) entre les différents acteurs de la chaîne judiciaire.
 
+## Captures d'écran
+
+| Tableau de bord du juge | Salle d'attente et vérification OTP |
+|---|---|
+| ![Tableau de bord du juge](docs/captures/dashboard-juge.png) | ![Salle d'attente](docs/captures/salle-attente.png) |
+
+| Audience en visioconférence | Procès-verbal et transcription |
+|---|---|
+| ![Audience Jitsi](docs/captures/audience-jitsi.png) | ![Procès-verbal](docs/captures/proces-verbal.png) |
+
 ## Sommaire
 
+- [Captures d'écran](#captures-décran)
 - [Fonctionnalités](#fonctionnalités)
 - [Rôles utilisateurs](#rôles-utilisateurs)
 - [Stack technique](#stack-technique)
